@@ -4,6 +4,7 @@ from spotipy.oauth2 import SpotifyClientCredentials
 import spotipy
 import re
 import requests
+import math
 
 # --- Spotify API Auth ---
 client_id = "feef7905dd374fd58ba72e08c0d77e70"
@@ -38,14 +39,17 @@ def generate_keyboard(song_list, page=0, per_page=8):
     end = start + per_page
     buttons = []
 
-    # Add song buttons (each in a separate row)
     for i, song in enumerate(song_list[start:end], start=1 + start):
         buttons.append([InlineKeyboardButton(text=f"{i}. {song}", callback_data="noop")])
 
-    # Navigation buttons row
+    total_pages = math.ceil(len(song_list) / per_page)
     nav_buttons = []
+
     if page > 0:
         nav_buttons.append(InlineKeyboardButton("⬅️ Back", callback_data=f"page:{page - 1}"))
+
+    nav_buttons.append(InlineKeyboardButton(f"📄 Page {page + 1}/{total_pages}", callback_data="noop"))
+
     if end < len(song_list):
         nav_buttons.append(InlineKeyboardButton("➡️ Next", callback_data=f"page:{page + 1}"))
 
@@ -73,14 +77,12 @@ async def handle_spotify_playlist(client, message):
 
             keyboard = generate_keyboard(songs, page=0)
 
-            # Send photo and save the bot's message ID as key in song_cache
             reply = await message.reply_photo(
                 photo="thumb.jpg",
-                caption=f"🎧 **Playlist**: {name}\n\n🎵 Select a song below:",
+                caption=f"🎧 **Playlist**: {name}\n📀 Total Songs: {len(songs)}\n\n🎵 Select a song below:",
                 reply_markup=keyboard
             )
 
-            # Save song list in cache using bot message ID
             song_cache[reply.id] = songs
 
         except Exception as e:
@@ -90,7 +92,7 @@ async def handle_spotify_playlist(client, message):
 @Client.on_callback_query(filters.regex("page:"))
 async def paginate_callback(client, callback_query):
     page = int(callback_query.data.split(":")[1])
-    message_id = callback_query.message.id  # Bot message ID
+    message_id = callback_query.message.id
 
     songs = song_cache.get(message_id)
     if not songs:
@@ -104,5 +106,3 @@ async def paginate_callback(client, callback_query):
 @Client.on_callback_query(filters.regex("noop"))
 async def handle_noop(client, callback_query):
     await callback_query.answer("🎵 Downloading soon...", show_alert=False)
-
-
