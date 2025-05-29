@@ -86,12 +86,12 @@ response_queue = Queue()  # Shared queue to hold bot responses
 
 # --- Capture Spotify bot responses ---
 @userbot.on_message(filters.chat(spotify_bot))
-async def handle_spotify_response(client, message: Message):
+async def handle_spotify_response(client, message):
     await response_queue.put(message)  # Push into queue
 
 # --- Userbot Link Handler ---
 @userbot.on_message(filters.private & filters.incoming & filters.text)
-async def handle_spotify_request(client, message: Message):
+async def handle_spotify_request(client, message):
     user_id = message.from_user.id
     text = message.text.strip()
 
