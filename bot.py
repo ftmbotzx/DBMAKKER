@@ -85,14 +85,31 @@ from pyrogram.errors import UserNotParticipant
 
 response_queue = Queue()  # Shared queue to hold bot responses
 
-# --- Capture Spotify bot responses ---
-@userbot.on_message(filters.chat(spotify_bot))
-async def handle_spotify_response(client, message):
-    await response_queue.put(message)  # Push into queue
-
-
 expected_tracks = {}  # Global dictionary to track user search
 
+@userbot.on_message(filters.private & filters.incoming & filters.text)
+async def handle_spotify_request(client, message):
+    user_id = message.from_user.id
+    text = message.text.strip()
+
+    if user_id not in ADMINS or "open.spotify.com/track" not in text:
+        return
+
+    try:
+        title, artist = extract_track_info(text)
+        await message.reply(f"🔍 Looking for: **{title.title()} - {artist.title()}**")
+    except Exception as e:
+        await message.reply(f"❌ Failed to fetch track info: {e}")
+        return
+
+    expected_tracks[user_id] = {"title": title, "artist": artist}
+
+    try:
+        await client.send_message(spotify_bot, text)
+    except Exception as e:
+        await message.reply(f"❌ Couldn't send to Spotify bot: {e}")
+
+# ------------ Handle Spotify Bot Response ------------
 @userbot.on_message(filters.chat(spotify_bot))
 async def handle_spotify_response(client, message):
     for user_id, info in expected_tracks.items():
@@ -100,7 +117,6 @@ async def handle_spotify_response(client, message):
         expected_artist = info["artist"]
 
         if message.audio:
-            # Check audio title or caption
             audio_title = (message.audio.title or "").lower()
             performer = (message.audio.performer or "").lower()
             caption = (message.caption or "").lower()
@@ -121,38 +137,11 @@ async def handle_spotify_response(client, message):
                         performer=message.audio.performer,
                         reply_markup=message.reply_markup
                     )
+                    del expected_tracks[user_id]
                 except Exception as e:
                     await client.send_message(user_id, f"⚠️ Error: {e}")
             else:
-                print(f"❌ Skipped - not matching: {audio_title} / {caption}")
-
-        # Optional: Also clean up entry after sending
-        # del expected_tracks[user_id]
-
-
-# --- Userbot Link Handler ---
-@userbot.on_message(filters.private & filters.incoming & filters.text)
-async def handle_spotify_request(client, message):
-    user_id = message.from_user.id
-    text = message.text.strip()
-
-    if user_id not in ADMINS or "open.spotify.com/track" not in text:
-        return
-
-    # Get Track Info
-    try:
-        title, artist = extract_track_info(text)
-        await message.reply(f"🔍 Looking for: **{title.title()} - {artist.title()}**")
-    except Exception as e:
-        await message.reply(f"❌ Failed to fetch track info: {e}")
-        return
-
-    # Save expected track info for later filtering
-    expected_tracks[user_id] = {"title": title, "artist": artist}
-
-    # Send to Spotify bot
-    await client.send_message(spotify_bot, text)
-
+                print(f"❌ Skipped - Not matched for {user_id}: {audio_title} / {caption}")
 
 # ------------------ Startup Main ------------------ #
 async def main():
