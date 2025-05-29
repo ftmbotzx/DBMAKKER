@@ -109,9 +109,10 @@ async def handle_spotify_request(client, message):
     except Exception as e:
         await message.reply(f"❌ Couldn't send to Spotify bot: {e}")
 
-# ------------ Handle Spotify Bot Response ------------
 @userbot.on_message(filters.chat(spotify_bot))
-async def handle_spotify_response(client, message):
+async def handle_spotify_response(client, message: Message):
+    to_delete = []
+
     for user_id, info in expected_tracks.items():
         expected_title = info["title"]
         expected_artist = info["artist"]
@@ -137,11 +138,13 @@ async def handle_spotify_response(client, message):
                         performer=message.audio.performer,
                         reply_markup=message.reply_markup
                     )
-                    del expected_tracks[user_id]
+                    to_delete.append(user_id)  # Mark for deletion after loop
                 except Exception as e:
                     await client.send_message(user_id, f"⚠️ Error: {e}")
-            else:
-                print(f"❌ Skipped - Not matched for {user_id}: {audio_title} / {caption}")
+
+    # Now safely delete keys
+    for user_id in to_delete:
+        expected_tracks.pop(user_id, None)
 
 # ------------------ Startup Main ------------------ #
 async def main():
