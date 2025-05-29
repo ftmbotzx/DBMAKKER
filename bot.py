@@ -1,25 +1,35 @@
-import logging
-import logging.config
 import os
+import logging
 import asyncio
-from pyrogram import Client, __version__
-from pyrogram.raw.all import layer
-from aiohttp import web
+import importlib
+from collections import deque
+
+import random
+
 import pytz
 from datetime import date, datetime
 from aiohttp import web
-from plugins import web_server
-from info import SESSION, API_ID, API_HASH, BOT_TOKEN, LOG_CHANNEL, PORT
-from pyrogram import types
-from pyrogram import utils as pyroutils
+from pyrogram import Client, __version__, filters, types, utils as pyroutils
+from pyrogram.raw.all import layer
 
+from plugins import web_server
+from info import SESSION, API_ID, API_HASH, BOT_TOKEN, LOG_CHANNEL, PORT, USER_SESSION
+from plugins.login import auto_login
+
+# Logging setup
+logging.basicConfig(level=logging.INFO)
+logging.getLogger("pyrogram").setLevel(logging.ERROR)
+
+# Adjust Pyrogram chat ID ranges
 pyroutils.MIN_CHAT_ID = -999999999999
 pyroutils.MIN_CHANNEL_ID = -100999999999999
 
-logging.getLogger().setLevel(logging.INFO)
-logging.getLogger("pyrogram").setLevel(logging.ERROR)
+# Message Queue Setup
+queue = deque()
+processing = False
+message_map = {}
 
-
+# ------------------ Bot Class ------------------ #
 class Bot(Client):
     def __init__(self):
         super().__init__(
@@ -31,9 +41,15 @@ class Bot(Client):
             plugins={"root": "plugins"},
             sleep_threshold=10,
         )
+        self.insta = None
 
     async def start(self):
         await super().start()
+        self.insta = await auto_login()
+        if self.insta:
+            logging.info("✅ Instagram session ready.")
+        else:
+            logging.error("❌ Instagram login failed.")
         me = await self.get_me()
         logging.info(f"🤖 {me.first_name} (@{me.username}) running on Pyrogram v{__version__} (Layer {layer})")
         tz = pytz.timezone('Asia/Kolkata')
@@ -50,5 +66,89 @@ class Bot(Client):
         await super().stop()
         logging.info("🛑 Bot Stopped.")
 
+
+# ------------------ Userbot Class ------------------ #
+class Userbot(Client):
+    def __init__(self):
+        super().__init__(
+            name="userbot",
+            api_id=API_ID,
+            api_hash=API_HASH,
+            session_string=USER_SESSION,
+            plugins={"root": "plugins"},
+            workers=50,
+        )
+
+
 app = Bot()
-app.run()
+userbot = Userbot()
+spotify_bot = "@spotspeekbot"
+
+
+# ------------------ Userbot Link Receiver ------------------ #
+@userbot.on_message(filters.private & filters.incoming & filters.text)
+async def handle_spotify_request(client, message):
+    user_id = message.from_user.id
+    text = message.text.strip()
+
+    if "open.spotify.com/playlist" in text or "track" in text:
+        await client.send_message(user_id, "🎧 Sending your link to Spotify bot...")
+
+        try:
+            # 1. Send user link to Spotify bot
+            await client.send_message(spotify_bot, text)
+
+            # 2. Wait for Spotify bot's first reply
+            response = await client.listen(spotify_bot, timeout=60)
+
+            # 3. Forward Spotify bot's message to user based on content
+            if response.audio:
+                await client.send_audio(
+                    chat_id=user_id,
+                    audio=response.audio.file_id,
+                    caption=response.caption or "",
+                    title=response.audio.title,
+                    performer=response.audio.performer,
+                    reply_markup=response.reply_markup
+                )
+            elif response.photo:
+                await client.send_photo(
+                    chat_id=user_id,
+                    photo=response.photo.file_id,
+                    caption=response.caption or "",
+                    reply_markup=response.reply_markup
+                )
+            elif response.text:
+                await client.send_message(
+                    chat_id=user_id,
+                    text=response.text,
+                    reply_markup=response.reply_markup
+                )
+            else:
+                await client.send_message(user_id, "⚠️ Unknown response from Spotify bot.")
+
+        except asyncio.TimeoutError:
+            await client.send_message(user_id, "❌ Spotify bot did not respond in time.")
+        except Exception as e:
+            await client.send_message(user_id, f"⚠️ Error occurred: {e}")
+    else:
+        await message.reply("❌ Please send a valid Spotify link.")
+
+# ------------------ Startup Main ------------------ #
+async def main():
+    await app.start()
+    logging.info("✅ Bot client started.")
+
+    await userbot.start()
+    logging.info(f"👤 Userbot: {(await userbot.get_me()).first_name}")
+
+    for file in os.listdir("./plugins"):
+        if file.endswith(".py"):
+            importlib.import_module(f"plugins.{file[:-3]}")
+
+    await asyncio.Event().wait()
+
+
+if __name__ == "__main__":
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(main()) 
