@@ -6,15 +6,16 @@ import re
 import requests
 import math
 from urllib.parse import urlparse
+from info import USERBOT_CHAT_ID
 
 client_id = "feef7905dd374fd58ba72e08c0d77e70"
 client_secret = "60b4007a8b184727829670e2e0f911ca"
 auth_manager = SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
 sp = spotipy.Spotify(auth_manager=auth_manager)
 
-song_cache = {}  # Stores {message_id: {"songs": [], "ids": []}}
+song_cache = {}  # {message_id: {"songs": [...], "track_ids": [...]}}
+selected_requests = {}  # {userbot_msg_id: {"user_id": ..., "reply_to": ...}}
 
-# --- Get Playlist Info ---
 def get_playlist_info(playlist_url):
     playlist_id = playlist_url.split("/")[-1].split("?")[0]
     playlist = sp.playlist(playlist_id)
@@ -27,32 +28,34 @@ def get_playlist_info(playlist_url):
 
     for item in playlist['tracks']['items']:
         track = item['track']
-        if not track:  # skip if track info is missing
-            continue
         name = track['name']
         artist = track['artists'][0]['name']
         track_id = track['id']
-        if name and artist and track_id:
-            song_list.append(f"{name} - {artist}")
-            track_ids.append(track_id)
+        song_list.append(f"{name} - {artist}")
+        track_ids.append(track_id)
 
     return image_url, playlist_name, song_list, track_ids
 
-# --- Generate Pagination Keyboard ---
-def generate_keyboard(song_list, page=0, per_page=8):
+# --- Generate Pagination Buttons ---
+def generate_keyboard(song_list, track_ids, page=0, per_page=8):
     start = page * per_page
     end = start + per_page
     buttons = []
 
-    for i, song in enumerate(song_list[start:end], start=start + 1):
-        buttons.append([InlineKeyboardButton(text=f"{i}. {song}", callback_data="noop")])
+    for i in range(start, min(end, len(song_list))):
+        buttons.append([
+            InlineKeyboardButton(
+                text=f"{i+1}. {song_list[i]}",
+                callback_data=f"trackid:{track_ids[i]}"
+            )
+        ])
 
     total_pages = math.ceil(len(song_list) / per_page)
     nav_buttons = []
 
     if page > 0:
         nav_buttons.append(InlineKeyboardButton("⬅️ Back", callback_data=f"page:{page - 1}"))
-    
+
     nav_buttons.append(InlineKeyboardButton(f"📄 Page {page + 1}/{total_pages}", callback_data="noop"))
 
     if end < len(song_list):
@@ -63,24 +66,24 @@ def generate_keyboard(song_list, page=0, per_page=8):
 
     return InlineKeyboardMarkup(buttons)
 
-# --- Handle Spotify Playlist URL ---
+# --- Message Handler ---
 @Client.on_message(filters.private & filters.text)
 async def handle_spotify_playlist(client, message):
     text = message.text.strip()
     spotify_pattern = r"https?://open\.spotify\.com/playlist/[a-zA-Z0-9]+"
 
     if re.search(spotify_pattern, text):
-        info_msg = await message.reply("⏳ Fetching Spotify playlist info...")
+        await message.reply("⏳ Fetching Spotify playlist info...")
 
         try:
             image_url, name, songs, track_ids = get_playlist_info(text)
 
-            # Download playlist image
+            # Download thumbnail
             image_data = requests.get(image_url).content
             with open("thumb.jpg", "wb") as f:
                 f.write(image_data)
 
-            keyboard = generate_keyboard(songs, page=0)
+            keyboard = generate_keyboard(songs, track_ids, page=0)
 
             reply = await message.reply_photo(
                 photo="thumb.jpg",
@@ -88,35 +91,75 @@ async def handle_spotify_playlist(client, message):
                 reply_markup=keyboard
             )
 
-            # Save in cache
-            song_cache[reply.id] = {"songs": songs, "ids": track_ids}
-
-            await info_msg.delete()
+            song_cache[reply.id] = {"songs": songs, "track_ids": track_ids}
 
         except Exception as e:
-            await info_msg.edit(f"⚠️ Error: {e}")
+            await message.reply(f"⚠️ Error: {e}")
 
-# --- Handle Pagination Buttons ---
+# --- Pagination Callback Handler ---
 @Client.on_callback_query(filters.regex("page:"))
 async def paginate_callback(client, callback_query):
     page = int(callback_query.data.split(":")[1])
     message_id = callback_query.message.id
 
-    cache = song_cache.get(message_id)
-    if not cache:
+    data = song_cache.get(message_id)
+    if not data:
         await callback_query.answer("❌ Song list expired.", show_alert=True)
         return
 
-    songs = cache["songs"]
-    keyboard = generate_keyboard(songs, page=page)
+    songs = data["songs"]
+    track_ids = data["track_ids"]
+    keyboard = generate_keyboard(songs, track_ids, page=page)
     await callback_query.edit_message_reply_markup(reply_markup=keyboard)
 
-# --- Dummy Buttons (No action) ---
+# --- Dummy Button Handler ---
 @Client.on_callback_query(filters.regex("noop"))
 async def handle_noop(client, callback_query):
     await callback_query.answer("🎵 Downloading soon...", show_alert=False)
 
-# --- Extract Track Info (Helper) ---
+# --- Track Selection Callback Handler ---
+@Client.on_callback_query(filters.regex("trackid:"))
+async def handle_trackid_click(client, callback_query):
+    track_id = callback_query.data.split(":")[1]
+    user_id = callback_query.from_user.id
+    msg_id = callback_query.message.id
+
+    data = song_cache.get(msg_id, {})
+    songs = data.get("songs", [])
+    track_ids = data.get("track_ids", [])
+
+    try:
+        index = track_ids.index(track_id)
+        song_name = songs[index]
+    except:
+        song_name = "Selected Song"
+
+    await callback_query.answer(f"🎵 Sending {song_name}")
+
+    spotify_url = f"https://open.spotify.com/track/{track_id}"
+
+    sent = await client.send_message(USERBOT_CHAT_ID, spotify_url)
+
+    selected_requests[sent.id] = {
+        "user_id": user_id,
+        "reply_to": msg_id
+    }
+
+# --- Handle Audio from Userbot ---
+@Client.on_message(filters.chat(USERBOT_CHAT_ID) & filters.audio)
+async def handle_userbot_audio(client, message):
+    info = selected_requests.pop(message.reply_to_message_id, None)
+    if not info:
+        return
+
+    await client.send_audio(
+        chat_id=info["user_id"],
+        audio=message.audio.file_id,
+        caption=message.caption or "",
+        reply_to_message_id=info["reply_to"]
+    )
+
+# --- Optional Utility ---
 def extract_track_info(spotify_url: str):
     parsed = urlparse(spotify_url)
     if "track" not in parsed.path:
