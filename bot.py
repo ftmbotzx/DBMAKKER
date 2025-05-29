@@ -88,7 +88,6 @@ response_queue = Queue()  # Shared queue to hold bot responses
 expected_tracks = {}
 import uuid
 
-import uuid
 
 @userbot.on_message(filters.private & filters.incoming & filters.text)
 async def handle_spotify_request(client, message):
@@ -108,7 +107,8 @@ async def handle_spotify_request(client, message):
     try:
         # Send message to spotify bot & get sent message object
         spotify_msg = await client.send_message(spotify_bot, text)
-        # Save mapping of spotify bot message id -> user_id
+        # Save mapping of spotify bot message id -> user_idlogg
+        logging.info(spotify_msg)
         expected_tracks[spotify_msg.message_id] = user_id
     except Exception as e:
         await message.reply(f"❌ Couldn't send to Spotify bot: {e}")
@@ -148,6 +148,7 @@ async def handle_spotify_response(client, message):
                 await client.send_message(user_id, "⚠️ Unknown response from Spotify bot.")
         except Exception as e:
             await client.send_message(user_id, f"⚠️ Error: {e}")
+
 # ------------------ Startup Main ------------------ #
 async def main():
     await app.start()
