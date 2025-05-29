@@ -85,35 +85,35 @@ from pyrogram.errors import UserNotParticipant
 
 response_queue = Queue()  # Shared queue to hold bot responses
 
-expected_tracks = {}  # Global dictionary to track user search
+expected_tracks = {}
 
 @userbot.on_message(filters.private & filters.incoming & filters.text)
 async def handle_spotify_request(client, message):
     user_id = message.from_user.id
     text = message.text.strip()
 
-    if user_id not in ADMINS or "open.spotify.com" not in text:
-        return
+    if "open.spotify.com/playlist" in text or "track" in text:
+        # Generate unique request ID for each incoming request
+        request_id = str(uuid.uuid4())
 
-    try:
-        title, artist = extract_track_info(text)
-        await message.reply(f"🔍 Looking for: **{title.title()} - {artist.title()}**")
-    except Exception as e:
-        await message.reply(f"❌ Failed to fetch track info: {e}")
-        return
+        # Fetch title/artist from Spotify API before forwarding (optional, depends on your logic)
+        # For example:
+        # title, artist = get_spotify_track_info(text)
+        # For demo, dummy values:
+        title, artist = "expected title", "expected artist"
 
-    expected_tracks[user_id] = {"title": title, "artist": artist}
+        # Save to expected_tracks with unique key
+        expected_tracks[(user_id, request_id)] = {"title": title.lower(), "artist": artist.lower()}
 
-    try:
+        await client.send_message(user_id, "🎧 Sending your link to Spotify bot...")
+
+        # Send message to Spotify bot
         await client.send_message(spotify_bot, text)
-    except Exception as e:
-        await message.reply(f"❌ Couldn't send to Spotify bot: {e}")
 
 @userbot.on_message(filters.chat(spotify_bot))
 async def handle_spotify_response(client, message):
     to_delete = []
-
-    for user_id, info in expected_tracks.items():
+    for (user_id, request_id), info in expected_tracks.items():
         expected_title = info["title"]
         expected_artist = info["artist"]
 
@@ -138,13 +138,12 @@ async def handle_spotify_response(client, message):
                         performer=message.audio.performer,
                         reply_markup=message.reply_markup
                     )
-                    to_delete.append(user_id)  # Mark for deletion after loop
+                    to_delete.append((user_id, request_id))  # Mark for deletion
                 except Exception as e:
                     await client.send_message(user_id, f"⚠️ Error: {e}")
 
-    # Now safely delete keys
-    for user_id in to_delete:
-        expected_tracks.pop(user_id, None)
+    for key in to_delete:
+        expected_tracks.pop(key, None)
 
 # ------------------ Startup Main ------------------ #
 async def main():
