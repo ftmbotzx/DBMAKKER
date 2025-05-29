@@ -110,7 +110,7 @@ async def handle_spotify_request(client, message):
         await message.reply(f"❌ Couldn't send to Spotify bot: {e}")
 
 @userbot.on_message(filters.chat(spotify_bot))
-async def handle_spotify_response(client, message: Message):
+async def handle_spotify_response(client, message):
     to_delete = []
 
     for user_id, info in expected_tracks.items():
