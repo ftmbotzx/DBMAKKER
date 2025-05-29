@@ -38,9 +38,11 @@ def generate_keyboard(song_list, page=0, per_page=8):
     end = start + per_page
     buttons = []
 
+    # Add song buttons (each in a separate row)
     for i, song in enumerate(song_list[start:end], start=1 + start):
         buttons.append([InlineKeyboardButton(text=f"{i}. {song}", callback_data="noop")])
 
+    # Navigation buttons row
     nav_buttons = []
     if page > 0:
         nav_buttons.append(InlineKeyboardButton("⬅️ Back", callback_data=f"page:{page - 1}"))
@@ -64,10 +66,6 @@ async def handle_spotify_playlist(client, message):
         try:
             image_url, name, songs = get_playlist_info(text)
 
-            # Save song list using message ID
-            message_id = message.id
-            song_cache[message_id] = songs
-
             # Download thumbnail
             image_data = requests.get(image_url).content
             with open("thumb.jpg", "wb") as f:
@@ -75,11 +73,15 @@ async def handle_spotify_playlist(client, message):
 
             keyboard = generate_keyboard(songs, page=0)
 
-            await message.reply_photo(
+            # Send photo and save the bot's message ID as key in song_cache
+            reply = await message.reply_photo(
                 photo="thumb.jpg",
                 caption=f"🎧 **Playlist**: {name}\n\n🎵 Select a song below:",
                 reply_markup=keyboard
             )
+
+            # Save song list in cache using bot message ID
+            song_cache[reply.message_id] = songs
 
         except Exception as e:
             await message.reply(f"⚠️ Error: {e}")
@@ -88,7 +90,7 @@ async def handle_spotify_playlist(client, message):
 @Client.on_callback_query(filters.regex("page:"))
 async def paginate_callback(client, callback_query: CallbackQuery):
     page = int(callback_query.data.split(":")[1])
-    message_id = callback_query.message.message_id  # ✅ FIXED
+    message_id = callback_query.message.message_id  # Bot message ID
 
     songs = song_cache.get(message_id)
     if not songs:
@@ -102,3 +104,5 @@ async def paginate_callback(client, callback_query: CallbackQuery):
 @Client.on_callback_query(filters.regex("noop"))
 async def handle_noop(client, callback_query: CallbackQuery):
     await callback_query.answer("🎵 Downloading soon...", show_alert=False)
+
+
