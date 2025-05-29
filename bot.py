@@ -86,6 +86,7 @@ from pyrogram.errors import UserNotParticipant
 response_queue = Queue()  # Shared queue to hold bot responses
 
 expected_tracks = {}
+import uuid
 
 @userbot.on_message(filters.private & filters.incoming & filters.text)
 async def handle_spotify_request(client, message):
