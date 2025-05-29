@@ -94,7 +94,7 @@ async def handle_spotify_response(client, message):
 expected_tracks = {}  # Global dictionary to track user search
 
 @userbot.on_message(filters.chat(spotify_bot))
-async def handle_spotify_response(client, message: Message):
+async def handle_spotify_response(client, message):
     for user_id, info in expected_tracks.items():
         expected_title = info["title"]
         expected_artist = info["artist"]
@@ -132,7 +132,7 @@ async def handle_spotify_response(client, message: Message):
 
 # --- Userbot Link Handler ---
 @userbot.on_message(filters.private & filters.incoming & filters.text)
-async def handle_spotify_request(client, message: Message):
+async def handle_spotify_request(client, message):
     user_id = message.from_user.id
     text = message.text.strip()
 
