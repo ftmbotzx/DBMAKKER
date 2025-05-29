@@ -89,7 +89,6 @@ expected_tracks = {}
 import uuid
 import re
 
-expected_tracks = {}
 
 @userbot.on_message(filters.private & filters.incoming & filters.text)
 async def handle_spotify_request(client, message):
