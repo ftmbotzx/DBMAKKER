@@ -94,7 +94,7 @@ async def handle_spotify_request(client, message):
     user_id = message.from_user.id
     text = message.text.strip()
 
-    if user_id not in ADMINS or "open.spotify.com" not in text:
+    if user_id not in ADMINS or "open.spotify.com/track" not in text:
         return
 
     try:
@@ -104,50 +104,53 @@ async def handle_spotify_request(client, message):
         await message.reply(f"❌ Failed to fetch track info: {e}")
         return
 
+    # Generate unique request ID for this request
+    request_id = str(uuid.uuid4())
+
+    # Save with composite key (user_id, request_id)
+    expected_tracks[(user_id, request_id)] = {"title": title.lower(), "artist": artist.lower()}
+
     try:
-        # Send message to spotify bot & get sent message object
-        spotify_msg = await client.send_message(spotify_bot, text)
-        # Save mapping of spotify bot message id -> user_idlogg
-        logging.info(spotify_msg)
-        expected_tracks[spotify_msg.id] = user_id
+        await client.send_message(spotify_bot, text)
     except Exception as e:
         await message.reply(f"❌ Couldn't send to Spotify bot: {e}")
 
 @userbot.on_message(filters.chat(spotify_bot))
 async def handle_spotify_response(client, message):
-    # Check if this message is a reply to a message sent by userbot to spotify_bot
-    reply_to = message.reply_to_message
-    if reply_to and reply_to.message_id in expected_tracks:
-        user_id = expected_tracks.pop(reply_to.id)
+    to_delete = []
 
-        # Forward audio or photo or text to the user
-        try:
-            if message.audio:
-                await client.send_audio(
-                    chat_id=user_id,
-                    audio=message.audio.file_id,
-                    caption=message.caption or "",
-                    title=message.audio.title,
-                    performer=message.audio.performer,
-                    reply_markup=message.reply_markup
-                )
-            elif message.photo:
-                await client.send_photo(
-                    chat_id=user_id,
-                    photo=message.photo.file_id,
-                    caption=message.caption or "",
-                    reply_markup=message.reply_markup
-                )
-            elif message.text:
-                await client.send_message(
-                    chat_id=user_id,
-                    text=message.text,
-                    reply_markup=message.reply_markup
-                )
-            else:
-                await client.send_message(user_id, "⚠️ Unknown response from Spotify bot.")
-        except Exception as e:
-            await client.send_message(user_id, f"⚠️ Error: {e}")
+    for (user_id, request_id), info in list(expected_tracks.items()):
+        expected_title = info["title"]
+        expected_artist = info["artist"]
+
+        if message.audio:
+            audio_title = (message.audio.title or "").lower()
+            performer = (message.audio.performer or "").lower()
+            caption = (message.caption or "").lower()
+
+            match = (
+                expected_title in audio_title or
+                expected_artist in performer or
+                expected_title in caption
+            )
+
+            if match:
+                try:
+                    await client.send_audio(
+                        chat_id=user_id,
+                        audio=message.audio.file_id,
+                        caption=message.caption or "",
+                        title=message.audio.title,
+                        performer=message.audio.performer,
+                        reply_markup=message.reply_markup
+                    )
+                    to_delete.append((user_id, request_id))  # Mark for deletion
+                except Exception as e:
+                    await client.send_message(user_id, f"⚠️ Error: {e}")
+
+    # Delete matched entries after iterating
+    for key in to_delete:
+        expected_tracks.pop(key, None)
 
 # ------------------ Startup Main ------------------ #
 async def main():
