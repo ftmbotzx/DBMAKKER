@@ -3,7 +3,7 @@ import logging
 import asyncio
 import importlib
 from collections import deque
-
+from asyncio import Queue
 import random
 
 import pytz
@@ -13,7 +13,7 @@ from pyrogram import Client, __version__, filters, types, utils as pyroutils
 from pyrogram.raw.all import layer
 
 from plugins import web_server
-from info import SESSION, API_ID, API_HASH, BOT_TOKEN, LOG_CHANNEL, PORT, USER_SESSION
+from info import SESSION, API_ID, API_HASH, BOT_TOKEN, LOG_CHANNEL, PORT, USER_SESSION, ADMINS
 
 # Logging setup
 logging.basicConfig(level=logging.INFO)
@@ -79,54 +79,67 @@ userbot = Userbot()
 spotify_bot = "@SpotSeekBot"
 
 
-# ------------------ Userbot Link Receiver ------------------ #
+from pyrogram.errors import UserNotParticipant
+
+
+response_queue = Queue()  # Shared queue to hold bot responses
+
+# --- Capture Spotify bot responses ---
+@userbot.on_message(filters.chat(spotify_bot))
+async def handle_spotify_response(client, message: Message):
+    await response_queue.put(message)  # Push into queue
+
+# --- Userbot Link Handler ---
 @userbot.on_message(filters.private & filters.incoming & filters.text)
-async def handle_spotify_request(client, message):
+async def handle_spotify_request(client, message: Message):
     user_id = message.from_user.id
     text = message.text.strip()
 
-    if "open.spotify.com/playlist" in text or "track" in text:
-        await client.send_message(user_id, "🎧 Sending your link to Spotify bot...")
+    if user_id not in ADMINS:
+        return  # Ignore non-admins
 
-        try:
-            # 1. Send user link to Spotify bot
-            await client.send_message(spotify_bot, text)
+    if "open.spotify.com/track" not in text:
+        return  # Only allow track links
 
-            # 2. Wait for Spotify bot's first reply
-            response = await client.listen(spotify_bot, timeout=60)
+    await client.send_message(user_id, "🎧 Sending your link to Spotify bot...")
 
-            # 3. Forward Spotify bot's message to user based on content
-            if response.audio:
-                await client.send_audio(
-                    chat_id=user_id,
-                    audio=response.audio.file_id,
-                    caption=response.caption or "",
-                    title=response.audio.title,
-                    performer=response.audio.performer,
-                    reply_markup=response.reply_markup
-                )
-            elif response.photo:
-                await client.send_photo(
-                    chat_id=user_id,
-                    photo=response.photo.file_id,
-                    caption=response.caption or "",
-                    reply_markup=response.reply_markup
-                )
-            elif response.text:
-                await client.send_message(
-                    chat_id=user_id,
-                    text=response.text,
-                    reply_markup=response.reply_markup
-                )
-            else:
-                await client.send_message(user_id, "⚠️ Unknown response from Spotify bot.")
+    try:
+        # 1. Send message to Spotify bot
+        await client.send_message(spotify_bot, text)
 
-        except asyncio.TimeoutError:
-            await client.send_message(user_id, "❌ Spotify bot did not respond in time.")
-        except Exception as e:
-            await client.send_message(user_id, f"⚠️ Error occurred: {e}")
-    else:
-        await message.reply("❌ Please send a valid Spotify link.")
+        # 2. Wait for reply from bot (via queue)
+        response: Message = await asyncio.wait_for(response_queue.get(), timeout=60)
+
+        # 3. Forward it back to the user
+        if response.audio:
+            await client.send_audio(
+                chat_id=user_id,
+                audio=response.audio.file_id,
+                caption=response.caption or "",
+                title=response.audio.title,
+                performer=response.audio.performer,
+                reply_markup=response.reply_markup
+            )
+        elif response.photo:
+            await client.send_photo(
+                chat_id=user_id,
+                photo=response.photo.file_id,
+                caption=response.caption or "",
+                reply_markup=response.reply_markup
+            )
+        elif response.text:
+            await client.send_message(
+                chat_id=user_id,
+                text=response.text,
+                reply_markup=response.reply_markup
+            )
+        else:
+            await client.send_message(user_id, "⚠️ Unknown response from Spotify bot.")
+
+    except asyncio.TimeoutError:
+        await client.send_message(user_id, "❌ Spotify bot did not respond in time.")
+    except Exception as e:
+        await client.send_message(user_id, f"⚠️ Error occurred: {e}")
 
 # ------------------ Startup Main ------------------ #
 async def main():
