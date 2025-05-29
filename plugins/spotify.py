@@ -88,7 +88,7 @@ async def handle_spotify_playlist(client, message):
 
 # --- Pagination Callback Handler ---
 @Client.on_callback_query(filters.regex("page:"))
-async def paginate_callback(client, callback_query: CallbackQuery):
+async def paginate_callback(client, callback_query):
     page = int(callback_query.data.split(":")[1])
     message_id = callback_query.message.message_id  # Bot message ID
 
@@ -102,7 +102,7 @@ async def paginate_callback(client, callback_query: CallbackQuery):
 
 # --- Dummy Button Handler ---
 @Client.on_callback_query(filters.regex("noop"))
-async def handle_noop(client, callback_query: CallbackQuery):
+async def handle_noop(client, callback_query):
     await callback_query.answer("🎵 Downloading soon...", show_alert=False)
 
 
