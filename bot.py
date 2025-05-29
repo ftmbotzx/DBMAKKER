@@ -105,60 +105,41 @@ async def handle_spotify_request(client, message):
         await message.reply(f"❌ Failed to fetch track info: {e}")
         return
 
-    # Unique request ID
-    request_id = str(uuid.uuid4())
-
-    # Save track info with composite key
-    expected_tracks[request_id] = {
-        "user_id": user_id,
+    expected_tracks[user_id].append({
         "title": title.lower(),
-        "artist": artist.lower()
-    }
-
-    # Append request ID in message to identify later
-    formatted_text = f"{text}\n\n🔑 ID: {request_id}"
+        "artist": artist.lower(),
+    })
 
     try:
-        await client.send_message(spotify_bot, formatted_text)
+        await client.send_message(spotify_bot, text)
     except Exception as e:
         await message.reply(f"❌ Couldn't send to Spotify bot: {e}")
 
 
-@userbot.on_message(filters.chat(spotify_bot))
+@userbot.on_message(filters.chat(spotify_bot) & filters.audio)
 async def handle_spotify_response(client, message):
-    if not message.audio:
-        return
-
-    # Try to extract request ID from caption
-    caption = (message.caption or "").lower()
-    match = re.search(r'id:\s*([a-f0-9-]+)', caption)
-    if not match:
-        return  # No ID found in caption
-
-    request_id = match.group(1)
-
-    # Check if we have a matching request
-    track_info = expected_tracks.get(request_id)
-    if not track_info:
-        return
-
-    user_id = track_info["user_id"]
-    expected_title = track_info["title"]
-    expected_artist = track_info["artist"]
-
     audio_title = (message.audio.title or "").lower()
     performer = (message.audio.performer or "").lower()
+    caption = (message.caption or "").lower()
 
-    match_found = (
-        expected_title in audio_title or
-        expected_artist in performer or
-        expected_title in caption
-    )
+    matched_user = None
 
-    if match_found:
+    for user_id, track_list in expected_tracks.items():
+        for track in track_list:
+            expected_title = track["title"]
+            expected_artist = track["artist"]
+
+            if expected_title in audio_title or expected_artist in performer or expected_title in caption:
+                matched_user = user_id
+                track_list.remove(track)  # Remove matched track
+                break
+        if matched_user:
+            break
+
+    if matched_user:
         try:
             await client.send_audio(
-                chat_id=user_id,
+                chat_id=matched_user,
                 audio=message.audio.file_id,
                 caption=message.caption or "",
                 title=message.audio.title,
@@ -166,9 +147,7 @@ async def handle_spotify_response(client, message):
                 reply_markup=message.reply_markup
             )
         except Exception as e:
-            await client.send_message(user_id, f"⚠️ Error: {e}")
-        finally:
-            expected_tracks.pop(request_id, None)  # Clean up after send
+            await client.send_message(matched_user, f"⚠️ Error: {e}")
 
 # ------------------ Startup Main ------------------ #
 async def main():
