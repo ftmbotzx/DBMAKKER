@@ -95,7 +95,7 @@ async def handle_spotify_request(client, message):
     user_id = message.from_user.id
     text = message.text.strip()
 
-    if user_id not in ADMINS or "open.spotify.com/track" not in text:
+    if user_id not in ADMINS or "open.spotify.com" not in text:
         return
 
     try:
