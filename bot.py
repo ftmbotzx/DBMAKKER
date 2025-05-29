@@ -88,33 +88,41 @@ response_queue = Queue()  # Shared queue to hold bot responses
 expected_tracks = {}
 import uuid
 
+import uuid
+
+expected_tracks = {}
+
 @userbot.on_message(filters.private & filters.incoming & filters.text)
 async def handle_spotify_request(client, message):
     user_id = message.from_user.id
     text = message.text.strip()
 
-    if "open.spotify.com" in text:
-        # Generate unique request ID for each incoming request
-        request_id = str(uuid.uuid4())
+    if user_id not in ADMINS or "open.spotify.com/track" not in text:
+        return
 
-        # Fetch title/artist from Spotify API before forwarding (optional, depends on your logic)
-        # For example:
-        # title, artist = get_spotify_track_info(text)
-        # For demo, dummy values:
-        title, artist = "expected title", "expected artist"
+    try:
+        title, artist = extract_track_info(text)
+        await message.reply(f"🔍 Looking for: **{title.title()} - {artist.title()}**")
+    except Exception as e:
+        await message.reply(f"❌ Failed to fetch track info: {e}")
+        return
 
-        # Save to expected_tracks with unique key
-        expected_tracks[(user_id, request_id)] = {"title": title.lower(), "artist": artist.lower()}
+    # Generate unique request ID for this request
+    request_id = str(uuid.uuid4())
 
-        await client.send_message(user_id, "🎧 Sending your link to Spotify bot...")
+    # Save with composite key (user_id, request_id)
+    expected_tracks[(user_id, request_id)] = {"title": title.lower(), "artist": artist.lower()}
 
-        # Send message to Spotify bot
+    try:
         await client.send_message(spotify_bot, text)
+    except Exception as e:
+        await message.reply(f"❌ Couldn't send to Spotify bot: {e}")
 
 @userbot.on_message(filters.chat(spotify_bot))
 async def handle_spotify_response(client, message):
     to_delete = []
-    for (user_id, request_id), info in expected_tracks.items():
+
+    for (user_id, request_id), info in list(expected_tracks.items()):
         expected_title = info["title"]
         expected_artist = info["artist"]
 
@@ -143,6 +151,7 @@ async def handle_spotify_response(client, message):
                 except Exception as e:
                     await client.send_message(user_id, f"⚠️ Error: {e}")
 
+    # Delete matched entries after iterating
     for key in to_delete:
         expected_tracks.pop(key, None)
 
