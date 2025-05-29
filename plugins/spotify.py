@@ -4,14 +4,11 @@ import spotipy
 import re
 import requests
 
-
 client_id = "feef7905dd374fd58ba72e08c0d77e70"
 client_secret = "60b4007a8b184727829670e2e0f911ca"
 
 auth_manager = SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
 sp = spotipy.Spotify(auth_manager=auth_manager)
-
-bot = Client
 
 # ---------- Function to Fetch Playlist Info ----------
 def get_playlist_info(playlist_url):
@@ -33,11 +30,9 @@ def get_playlist_info(playlist_url):
 
 
 # ---------- Handler ----------
-@bot.on_message(filters.text & filters.private)
+@Client.on_message(filters.text & filters.private)
 async def handle_spotify_playlist(client, message):
     text = message.text.strip()
-
-    # Regex to check Spotify playlist link
     spotify_pattern = r"https?://open\.spotify\.com/playlist/[a-zA-Z0-9]+"
 
     if re.search(spotify_pattern, text):
@@ -46,17 +41,30 @@ async def handle_spotify_playlist(client, message):
         try:
             image_url, name, songs = get_playlist_info(text)
 
-            # Download thumbnail image to send
+            # Download thumbnail image
             image_data = requests.get(image_url).content
             with open("thumb.jpg", "wb") as f:
                 f.write(image_data)
 
-            song_text = "\n".join([f"{i+1}. {song}" for i, song in enumerate(songs)])
-
+            # First message with thumbnail and few songs
+            preview_songs = "\n".join([f"{i+1}. {song}" for i, song in enumerate(songs[:5])])
             await message.reply_photo(
                 photo="thumb.jpg",
-                caption=f"🎧 **Playlist**: {name}\n\n🎵 **Songs:**\n{song_text[:4000]}"
+                caption=f"🎧 **Playlist**: {name}\n\n🎵 **Top Songs:**\n{preview_songs}"
             )
+
+            # Send full list in chunks (1024 char safe side)
+            chunk = ""
+            count = 6
+            for song in songs[5:]:
+                line = f"{count}. {song}\n"
+                if len(chunk) + len(line) > 4000:
+                    await message.reply(chunk)
+                    chunk = ""
+                chunk += line
+                count += 1
+            if chunk:
+                await message.reply(chunk)
 
         except Exception as e:
             await message.reply(f"⚠️ Error fetching playlist: {e}")
