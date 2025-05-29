@@ -90,7 +90,7 @@ async def handle_spotify_playlist(client, message):
 @Client.on_callback_query(filters.regex("page:"))
 async def paginate_callback(client, callback_query):
     page = int(callback_query.data.split(":")[1])
-    message_id = callback_query.message.message_id  # Bot message ID
+    message_id = callback_query.message.id  # Bot message ID
 
     songs = song_cache.get(message_id)
     if not songs:
