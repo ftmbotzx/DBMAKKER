@@ -5,6 +5,7 @@ import spotipy
 import re
 import requests
 import math
+from urllib.parse import urlparse
 
 # --- Spotify API Auth ---
 client_id = "feef7905dd374fd58ba72e08c0d77e70"
