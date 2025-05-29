@@ -130,9 +130,7 @@ async def handle_spotify_response(client, message):
             caption = (message.caption or "").lower()
 
             match = (
-                expected_title in audio_title or
-                expected_artist in performer or
-                expected_title in caption
+                expected_title in audio_title
             )
 
             if match:
