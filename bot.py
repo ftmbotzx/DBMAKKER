@@ -14,7 +14,6 @@ from pyrogram.raw.all import layer
 
 from plugins import web_server
 from info import SESSION, API_ID, API_HASH, BOT_TOKEN, LOG_CHANNEL, PORT, USER_SESSION
-from plugins.login import auto_login
 
 # Logging setup
 logging.basicConfig(level=logging.INFO)
@@ -45,11 +44,6 @@ class Bot(Client):
 
     async def start(self):
         await super().start()
-        self.insta = await auto_login()
-        if self.insta:
-            logging.info("✅ Instagram session ready.")
-        else:
-            logging.error("❌ Instagram login failed.")
         me = await self.get_me()
         logging.info(f"🤖 {me.first_name} (@{me.username}) running on Pyrogram v{__version__} (Layer {layer})")
         tz = pytz.timezone('Asia/Kolkata')
