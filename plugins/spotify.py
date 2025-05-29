@@ -106,3 +106,16 @@ async def paginate_callback(client, callback_query):
 @Client.on_callback_query(filters.regex("noop"))
 async def handle_noop(client, callback_query):
     await callback_query.answer("🎵 Downloading soon...", show_alert=False)
+
+
+def extract_track_info(spotify_url: str):
+    parsed = urlparse(spotify_url)
+    if "track" not in parsed.path:
+        return None
+
+    track_id = parsed.path.split("/")[-1]
+    result = sp.track(track_id)
+
+    title = result['name']
+    artist = result['artists'][0]['name']
+    return title.lower(), artist.lower()
