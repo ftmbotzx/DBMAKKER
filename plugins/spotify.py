@@ -7,16 +7,15 @@ import requests
 import math
 from urllib.parse import urlparse
 
-# --- Spotify API Auth ---
+
 client_id = "feef7905dd374fd58ba72e08c0d77e70"
 client_secret = "60b4007a8b184727829670e2e0f911ca"
 auth_manager = SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
 sp = spotipy.Spotify(auth_manager=auth_manager)
 
-# --- Temporary Song Cache ---
+
 song_cache = {}
 
-# --- Fetch Playlist Info ---
 def get_playlist_info(playlist_url):
     playlist_id = playlist_url.split("/")[-1].split("?")[0]
     playlist = sp.playlist(playlist_id)
