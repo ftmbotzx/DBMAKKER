@@ -105,48 +105,49 @@ async def handle_spotify_request(client, message):
     request_id = str(uuid.uuid4())
 
     # Save with composite key (user_id, request_id)
-    expected_tracks[(user_id, request_id)] = {"title": title.lower(), "artist": artist.lower()}
-
+    expected_tracks[(user_id, request_id)] = {
+        "title": title.lower(),
+        "artist": artist.lower(),
+        "message_id": message.id
+    }
     try:
         await client.send_message(spotify_bot, text)
     except Exception as e:
         await message.reply(f"❌ Couldn't send to Spotify bot: {e}")
 
-@userbot.on_message(filters.chat(spotify_bot))
+@userbot.on_message(filters.chat(spotify_bot) & filters.audio)
 async def handle_spotify_response(client, message):
     to_delete = []
 
     for (user_id, request_id), info in list(expected_tracks.items()):
         expected_title = info["title"]
         expected_artist = info["artist"]
+        message_id = info.get("message_id")
 
-        if message.audio:
-            audio_title = (message.audio.title or "").lower()
-            performer = (message.audio.performer or "").lower()
-            caption = (message.caption or "").lower()
+        audio_title = (message.audio.title or "").lower()
+        performer = (message.audio.performer or "").lower()
+        caption = (message.caption or "").lower()
 
-            match = (
-                expected_title in audio_title
-            )
+        match = expected_title in audio_title or expected_artist in performer or expected_title in caption
 
-            if match:
-                try:
-                    await client.send_audio(
-                        chat_id=user_id,
-                        audio=message.audio.file_id,
-                        caption=message.caption or "",
-                        title=message.audio.title,
-                        performer=message.audio.performer,
-                        reply_markup=message.reply_markup
-                    )
-                    to_delete.append((user_id, request_id))  # Mark for deletion
-                except Exception as e:
-                    await client.send_message(user_id, f"⚠️ Error: {e}")
+        if match:
+            try:
+                await client.send_audio(
+                    chat_id=user_id,
+                    audio=message.audio.file_id,
+                    caption=message.caption or "",
+                    title=message.audio.title,
+                    performer=message.audio.performer,
+                    reply_markup=message.reply_markup,
+                    reply_to_message_id=message_id  # 👈 user ke message ka reply
+                )
+                to_delete.append((user_id, request_id))
+            except Exception as e:
+                await client.send_message(user_id, f"⚠️ Error: {e}")
 
-    # Delete matched entries after iterating
     for key in to_delete:
         expected_tracks.pop(key, None)
-        
+
 
 
 # ------------------ Startup Main ------------------ #
