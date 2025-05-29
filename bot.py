@@ -92,7 +92,7 @@ async def handle_spotify_request(client, message):
     user_id = message.from_user.id
     text = message.text.strip()
 
-    if "open.spotify.com/playlist" in text or "track" in text:
+    if "open.spotify.com/" in text or "track" in text:
         # Generate unique request ID for each incoming request
         request_id = str(uuid.uuid4())
 
