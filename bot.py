@@ -109,7 +109,7 @@ async def handle_spotify_request(client, message):
         spotify_msg = await client.send_message(spotify_bot, text)
         # Save mapping of spotify bot message id -> user_idlogg
         logging.info(spotify_msg)
-        expected_tracks[spotify_msg.message_id] = user_id
+        expected_tracks[spotify_msg.id] = user_id
     except Exception as e:
         await message.reply(f"❌ Couldn't send to Spotify bot: {e}")
 
@@ -118,7 +118,7 @@ async def handle_spotify_response(client, message):
     # Check if this message is a reply to a message sent by userbot to spotify_bot
     reply_to = message.reply_to_message
     if reply_to and reply_to.message_id in expected_tracks:
-        user_id = expected_tracks.pop(reply_to.message_id)
+        user_id = expected_tracks.pop(reply_to.id)
 
         # Forward audio or photo or text to the user
         try:
