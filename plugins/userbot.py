@@ -1,4 +1,4 @@
-from bot import userbot
+from bot import userbot, spotify_bot
 from pyrogram import Client, filters
 from info import ADMINS
 from plugins.spotify import extract_track_info
