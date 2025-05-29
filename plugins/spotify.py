@@ -81,7 +81,7 @@ async def handle_spotify_playlist(client, message):
             )
 
             # Save song list in cache using bot message ID
-            song_cache[reply.message_id] = songs
+            song_cache[reply.id] = songs
 
         except Exception as e:
             await message.reply(f"⚠️ Error: {e}")
