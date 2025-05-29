@@ -76,7 +76,7 @@ class Userbot(Client):
 
 app = Bot()
 userbot = Userbot()
-spotify_bot = "@spotspeekbot"
+spotify_bot = "@SpotSeekBot"
 
 
 # ------------------ Userbot Link Receiver ------------------ #
