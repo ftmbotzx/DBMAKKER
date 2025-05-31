@@ -174,7 +174,7 @@ async def handle_trackid_click(client, callback_query):
 
 
 @Client.on_message(filters.chat(USERBOT_CHAT_ID) & filters.reply)
-async def bot_reply_handler(client, message: Message):
+async def bot_reply_handler(client, message):
     # Log the incoming message text or caption
     logging.info(f"📩 Userbot reply received | From: {message.from_user.id} | Text: {message.text or message.caption or 'No text'}")
 
