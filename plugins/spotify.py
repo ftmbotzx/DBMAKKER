@@ -140,8 +140,6 @@ async def paginate_callback(client, callback_query):
 async def handle_noop(client, callback_query):
     await callback_query.answer("🎵 Downloading soon...", show_alert=False)
 
-# --- Track Selection Callback Handler ---
-from pyrogram.types import Message
 
 message_map = {}
 
@@ -176,7 +174,7 @@ async def handle_trackid_click(client, callback_query):
 
 
 @Client.on_message(filters.chat(USERBOT_CHAT_ID) & filters.reply)
-async def bot_reply_handler(client, message: Message):
+async def bot_reply_handler(client, message):
     reply_to_msg = message.reply_to_message
     reply_to_id = reply_to_msg.id  # This is the message sent to USERBOT_CHAT_ID
 
