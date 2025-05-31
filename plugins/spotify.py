@@ -164,9 +164,9 @@ async def handle_music_reply_handler(client, message):
 
     user_id, reply_to_msg_id = info["user_id"], info["reply_to"]
 
-    # Store caption text like "🔍 Looking for: ..."
     if message.text and message.text.startswith("🔍 Looking for:"):
         selected_requests[reply_to_id]["caption"] = message.text
+        
         return
 
     # Handle Not Found
@@ -182,7 +182,7 @@ async def handle_music_reply_handler(client, message):
     # Now handle Audio with stored caption (if available)
     if message.audio:
         info = selected_requests.pop(reply_to_id, None)
-        caption = info.get("caption") or message.caption or "**🎵 Here's your song:**"
+        caption = "**🎵 Here's your song:**"
 
         try:
             await client.send_audio(
