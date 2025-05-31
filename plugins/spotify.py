@@ -167,6 +167,7 @@ async def handle_music_reply_handler(client, message):
     reply_to_msg_id = info["reply_to"]
 
     text_lower = (message.text or "").lower()
+    logging.info(f"{text_lower}")
 
     if "looking" in text_lower:
         await client.send_message(
