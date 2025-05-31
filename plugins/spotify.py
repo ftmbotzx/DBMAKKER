@@ -142,13 +142,15 @@ async def handle_trackid_click(client, callback_query):
     await callback_query.answer(f"🎵 Sending {song_name}")
 
     spotify_url = f"https://open.spotify.com/track/{track_id}"
-
     sent = await client.send_message(USERBOT_CHAT_ID, spotify_url)
 
+    # Save track request data
     selected_requests[sent.id] = {
         "user_id": user_id,
-        "reply_to": msg_id
+        "reply_to": msg_id,
+        "status": "waiting"
     }
+
 
 # --- Handle Audio from Userbot ---
 @Client.on_message(filters.chat(USERBOT_CHAT_ID) & filters.audio)
@@ -164,33 +166,56 @@ async def handle_userbot_audio(client, message):
         reply_to_message_id=info["reply_to"]
     )
 
-# --- Optional Utility ---
-import logging
-from urllib.parse import urlparse
+@Client.on_message(filters.chat(USERBOT_CHAT_ID) & filters.text)
+async def handle_userbot_text(client, message):
+    text = message.text.lower()
+    reply_id = message.reply_to_message_id
+
+    info = selected_requests.get(reply_id)
+    if not info:
+        return
+
+    # Forward the "🔍 Looking for" message to user
+    if text.startswith("🔍 looking for"):
+        try:
+            await client.forward_messages(
+                chat_id=info["user_id"],
+                from_chat_id=message.chat.id,
+                message_ids=message.id
+            )
+        except Exception as e:
+            print(f"Forward error: {e}")
+        return
+
+    # Handle "not found" or "sorry" messages
+    if (
+        "not available" in text
+        or "sorry" in text
+        or "try another" in text
+    ):
+        selected_requests.pop(reply_id, None)
+        await client.send_message(
+            chat_id=info["user_id"],
+            text="❌ Sorry, the track could not be found or downloaded.",
+            reply_to_message_id=info["reply_to"]
+        )
+
 
 def extract_track_info(spotify_url: str):
-    logging.info(f"Received Spotify URL: {spotify_url}")
-    
     parsed = urlparse(spotify_url)
-    logging.info(f"Parsed URL path: {parsed.path}")
     
     if "track" not in parsed.path:
         logging.warning("URL does not contain 'track' in path. Returning None.")
         return None
-    
-    # Extract track_id properly removing query params
+
     track_id = parsed.path.split("/")[-1].split("?")[0]
-    logging.info(f"Extracted track ID: {track_id}")
-    
     try:
         result = sp.track(track_id)
-        logging.info(f"Spotify API response for track ID {track_id}: {result}")
     except Exception as e:
         logging.error(f"Error fetching track info from Spotify API: {e}")
         return None
-    
+
     title = result['name']
     artist = result['artists'][0]['name']
-    logging.info(f"Extracted Title: {title}, Artist: {artist}")
     
     return title.lower(), artist.lower()
