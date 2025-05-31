@@ -166,7 +166,7 @@ async def handle_music_reply_handler(client, message):
     reply_to_msg_id = info["reply_to"]
 
     # If it's a "Looking for..." message, just send it as is
-    if message.text and message.text.startswith("🔍 Looking for:"):
+    if message.text and message.text.startswith("🔍"):
         await client.send_message(
             chat_id=user_id,
             text=message.text,
