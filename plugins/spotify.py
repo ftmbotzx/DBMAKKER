@@ -7,6 +7,11 @@ import requests
 import math
 from urllib.parse import urlparse
 from info import USERBOT_CHAT_ID
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logging.getLogger("pyrogram").setLevel(logging.ERROR)
+
 
 client_id = "feef7905dd374fd58ba72e08c0d77e70"
 client_secret = "60b4007a8b184727829670e2e0f911ca"
@@ -160,14 +165,32 @@ async def handle_userbot_audio(client, message):
     )
 
 # --- Optional Utility ---
+import logging
+from urllib.parse import urlparse
+
 def extract_track_info(spotify_url: str):
+    logging.info(f"Received Spotify URL: {spotify_url}")
+    
     parsed = urlparse(spotify_url)
+    logging.info(f"Parsed URL path: {parsed.path}")
+    
     if "track" not in parsed.path:
+        logging.warning("URL does not contain 'track' in path. Returning None.")
         return None
-
-    track_id = parsed.path.split("/")[-1]
-    result = sp.track(track_id)
-
+    
+    # Extract track_id properly removing query params
+    track_id = parsed.path.split("/")[-1].split("?")[0]
+    logging.info(f"Extracted track ID: {track_id}")
+    
+    try:
+        result = sp.track(track_id)
+        logging.info(f"Spotify API response for track ID {track_id}: {result}")
+    except Exception as e:
+        logging.error(f"Error fetching track info from Spotify API: {e}")
+        return None
+    
     title = result['name']
     artist = result['artists'][0]['name']
+    logging.info(f"Extracted Title: {title}, Artist: {artist}")
+    
     return title.lower(), artist.lower()
