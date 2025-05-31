@@ -153,52 +153,46 @@ async def handle_trackid_click(client, callback_query):
 
 
 # --- Handle Audio from Userbot ---
-@Client.on_message(filters.chat(USERBOT_CHAT_ID) & filters.audio)
-async def handle_userbot_audio(client, message):
-    info = selected_requests.pop(message.reply_to_message_id, None)
+@Client.on_message(filters.chat(USERBOT_CHAT_ID) & (filters.text | filters.audio) & filters.reply)
+async def handle_music_reply_handler(client, message):
+    reply_to_msg = message.reply_to_message
+    reply_to_id = reply_to_msg.id
+
+    info = selected_requests.get(reply_to_id)
     if not info:
         return
 
-    await client.send_audio(
-        chat_id=info["user_id"],
-        audio=message.audio.file_id,
-        caption=message.caption or "",
-        reply_to_message_id=info["reply_to"]
-    )
+    user_id, reply_to_msg_id = info["user_id"], info["reply_to"]
 
-@Client.on_message(filters.chat(USERBOT_CHAT_ID) & filters.text)
-async def handle_userbot_text(client, message):
-    text = message.text
-    reply_id = message.reply_to_message_id
-
-    info = selected_requests.get(reply_id)
-    if not info:
+    # Store caption text like "🔍 Looking for: ..."
+    if message.text and message.text.startswith("🔍 Looking for:"):
+        selected_requests[reply_to_id]["caption"] = message.text
         return
 
-    # Forward the "🔍 Looking for" message to user
-    if text.startswith("🔍"):
+    # Handle Not Found
+    if message.text and any(x in message.text.lower() for x in ["not available", "sorry", "try another"]):
+        selected_requests.pop(reply_to_id, None)
+        await client.send_message(
+            chat_id=user_id,
+            text="❌ Sorry, the requested song could not be found.",
+            reply_to_message_id=reply_to_msg_id
+        )
+        return
+
+    # Now handle Audio with stored caption (if available)
+    if message.audio:
+        info = selected_requests.pop(reply_to_id, None)
+        caption = info.get("caption") or message.caption or "**🎵 Here's your song:**"
+
         try:
-            await client.forward_messages(
-                chat_id=info["user_id"],
-                from_chat_id=message.chat.id,
-                message_ids=message.id
+            await client.send_audio(
+                chat_id=user_id,
+                audio=message.audio.file_id,
+                caption=caption,
+                reply_to_message_id=reply_to_msg_id
             )
         except Exception as e:
-            print(f"Forward error: {e}")
-        return
-
-    # Handle "not found" or "sorry" messages
-    if (
-        "not available" in text
-        or "sorry" in text
-        or "try another" in text
-    ):
-        selected_requests.pop(reply_id, None)
-        await client.send_message(
-            chat_id=info["user_id"],
-            text="❌ Sorry, the track could not be found or downloaded.",
-            reply_to_message_id=info["reply_to"]
-        )
+            await client.send_message(LOG_CHANNEL, f"❌ Error sending audio to user `{user_id}`\n**Error:** `{str(e)}`")
 
 
 def extract_track_info(spotify_url: str):
