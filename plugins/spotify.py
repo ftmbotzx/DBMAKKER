@@ -150,7 +150,8 @@ async def handle_trackid_click(client, callback_query):
         "reply_to": msg_id,
         "status": "waiting"
     }
-
+    
+import unicodedata
 
 # --- Handle Audio from Userbot ---
 @Client.on_message(filters.chat(USERBOT_CHAT_ID) & (filters.text | filters.audio) & filters.reply)
@@ -165,8 +166,9 @@ async def handle_music_reply_handler(client, message):
     user_id = info["user_id"]
     reply_to_msg_id = info["reply_to"]
 
-    # If it's a "Looking for..." message, just send it as is
-    if message.text and message.text.startswith("🔍"):
+    normalized_text = unicodedata.normalize("NFKD", message.text or "").strip()
+
+    if normalized_text.startswith("🔍 Looking for:"):
         await client.send_message(
             chat_id=user_id,
             text=message.text,
