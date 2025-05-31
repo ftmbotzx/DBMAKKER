@@ -165,9 +165,9 @@ async def handle_music_reply_handler(client, message):
 
     user_id = info["user_id"]
     reply_to_msg_id = info["reply_to"]
-
-    text_lower = (message.text or "").lower()
-    logging.info(f"{text_lower}")
+    msg = message.text
+    text_lower = (message.text or "looking").lower()
+    logging.info(f"{text_lower}/ {msg}")
 
     if "looking" in text_lower:
         await client.send_message(
