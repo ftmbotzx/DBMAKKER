@@ -143,6 +143,33 @@ async def handle_noop(client, callback_query):
 
 message_map = {}
 
+from pyrogram.types import InputMediaAudio
+
+
+import aiohttp
+
+async def get_song_download_url(song_title, artist_name):
+    query = f"{song_title}"
+
+    api_url = f"https://jiosaavn.funtoonsmultimedia.workers.dev/api/search/songs?query={query}"
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(api_url) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                results = data.get("data", {}).get("results", [])
+
+                if results:
+                    first_result = results[0]
+                    song_name = first_result.get("name")
+                    download_url = first_result.get("url")
+                    return song_name, download_url
+                else:
+                    return None, None
+            else:
+                return None, None
+
+
 @Client.on_callback_query(filters.regex("trackid:"))
 async def handle_trackid_click(client, callback_query):
     track_id = callback_query.data.split(":")[1]
@@ -160,53 +187,23 @@ async def handle_trackid_click(client, callback_query):
         song_name = "Selected Song"
 
     await callback_query.answer(f"🎵 Sending {song_name}")
+    wait_msg = await client.send_message(user_id, "🔄 Please wait... fetching your song.")
 
+    # Spotify API se original title & artist nikaalo
     spotify_url = f"https://open.spotify.com/track/{track_id}"
+    title_artist = extract_track_info(spotify_url)
 
-    wait_msg = await client.send_message(user_id, "🔄 **Please wait... fetching your song.**")
-    
-    # Send track URL to USERBOT_CHAT_ID
-    sent = await client.send_message(USERBOT_CHAT_ID, spotify_url)
-
-    # Map the user with the reply message id
-    message_map[sent.id] = (user_id, callback_query.message.id, wait_msg.id)
-
-
-
-@Client.on_message(filters.chat(USERBOT_CHAT_ID) & filters.reply)
-async def bot_reply_handler(client, message):
-    # Log the incoming message text or caption
-    logging.info(f"📩 Userbot reply received | From: {message.from_user.id} | Text: {message.text or message.caption or 'No text'}")
-
-    reply_to_msg = message.reply_to_message
-    reply_to_id = reply_to_msg.id  # Message sent to USERBOT_CHAT_ID
-
-    user_data = message_map.get(reply_to_id)
-    if not user_data:
+    if not title_artist:
+        await wait_msg.edit("⚠️ Failed to extract song details from Spotify.")
         return
 
-    user_id, original_msg_id, wait_msg_id = user_data
-    url = getattr(reply_to_msg, "text", None) or getattr(reply_to_msg, "caption", None) or "URL Not Found"
+    title, artist = title_artist
+    song_title, song_url = await get_song_download_url(title, artist)
 
-    try:
-        if message.media:
-            await client.copy_message(
-                chat_id=user_id,
-                from_chat_id=USERBOT_CHAT_ID,
-                message_id=message.id,
-                reply_to_message_id=original_msg_id,
-                caption="🎧 **Here is your Spotify track!**\n\n🎶 Enjoy your music.\n\nProvided by @Ans_Bots"
-            )
-        elif message.text:
-            await client.send_message(chat_id=user_id, text=message.text)
+    if not song_url:
+        await wait_msg.edit("❌ Song not found on JioSaavn.")
+        return
 
-        if wait_msg_id:
-            try:
-                await client.delete_messages(chat_id=user_id, message_ids=[wait_msg_id])
-            except Exception as e:
-                logging.warning(f"Couldn't delete wait message for {user_id}: {e}")
+    # Send download link (or you can download and upload file)
+    await wait_msg.edit(f"✅ Found: **{song_title}**\n🔗 [Listen/Download]({song_url})", disable_web_page_preview=False)
 
-        del message_map[reply_to_id]
-
-    except Exception as e:
-        await client.send_message(LOG_CHANNEL, f"❌ Error delivering Spotify file\n🔗 {url}\n**Error:** `{str(e)}`")
