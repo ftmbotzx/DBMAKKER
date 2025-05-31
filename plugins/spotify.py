@@ -176,7 +176,7 @@ async def handle_userbot_text(client, message):
         return
 
     # Forward the "🔍 Looking for" message to user
-    if text.startswith("🔍 Looking for"):
+    if text.startswith("🔍"):
         try:
             await client.forward_messages(
                 chat_id=info["user_id"],
