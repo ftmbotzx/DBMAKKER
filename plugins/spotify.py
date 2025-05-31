@@ -150,55 +150,30 @@ async def handle_trackid_click(client, callback_query):
         "reply_to": msg_id,
         "status": "waiting"
     }
-    
 
-
-# --- Handle Audio from Userbot ---
-@Client.on_message(filters.chat(USERBOT_CHAT_ID) & (filters.text | filters.audio) & filters.reply)
-async def handle_music_reply_handler(client, message):
+@Client.on_message(filters.chat(USERBOT_CHAT_ID) & filters.reply)
+async def handle_userbot_reply(client, message):
+    # This is a reply from userbot to the track message we sent
     reply_to_msg = message.reply_to_message
-    reply_to_id = reply_to_msg.id
-
-    info = selected_requests.get(reply_to_id)
-    if not info:
+    if not reply_to_msg:
+        return
+    
+    original_msg_id = reply_to_msg.id
+    
+    # Check if this original message is in selected_requests
+    request_data = selected_requests.get(original_msg_id)
+    if not request_data:
         return
 
-    user_id = info["user_id"]
-    reply_to_msg_id = info["reply_to"]
-    msg = message.text
-    text_lower = (message.text or "looking").lower()
-    logging.info(f"{text_lower}/ {msg}")
-
-    if "looking" in text_lower:
-        await client.send_message(
-            chat_id=user_id,
-            text=message.text,
-            reply_to_message_id=reply_to_msg_id
-        )
-        return
-
-    # Handle Not Found case
-    if message.text and any(x in message.text.lower() for x in ["not available", "sorry", "try another"]):
-        selected_requests.pop(reply_to_id, None)
-        await client.send_message(
-            chat_id=user_id,
-            text="❌ Sorry, the requested song could not be found.",
-            reply_to_message_id=reply_to_msg_id
-        )
-        return
-
-    # Handle audio without saving any caption
-    if message.audio:
-        selected_requests.pop(reply_to_id, None)
-        try:
-            await client.send_audio(
-                chat_id=user_id,
-                audio=message.audio.file_id,
-                caption="🎵",
-                reply_to_message_id=reply_to_msg_id
-            )
-        except Exception as e:
-            await client.send_message(LOG_CHANNEL, f"❌ Error sending audio to user `{user_id}`\n**Error:** `{str(e)}`")
+    user_id = request_data["user_id"]
+    
+    # Forward userbot's reply text or message to original user
+    try:
+        await client.send_message(user_id, message.text)
+        # Optionally update the status
+        selected_requests[original_msg_id]["status"] = "replied"
+    except Exception as e:
+        logging.error(f"Failed to forward userbot reply to user: {e}")
 
 
 def extract_track_info(spotify_url: str):
