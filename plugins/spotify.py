@@ -162,14 +162,19 @@ async def handle_music_reply_handler(client, message):
     if not info:
         return
 
-    user_id, reply_to_msg_id = info["user_id"], info["reply_to"]
+    user_id = info["user_id"]
+    reply_to_msg_id = info["reply_to"]
 
+    # If it's a "Looking for..." message, just send it as is
     if message.text and message.text.startswith("🔍 Looking for:"):
-        selected_requests[reply_to_id]["caption"] = message.text
-        
+        await client.send_message(
+            chat_id=user_id,
+            text=message.text,
+            reply_to_message_id=reply_to_msg_id
+        )
         return
 
-    # Handle Not Found
+    # Handle Not Found case
     if message.text and any(x in message.text.lower() for x in ["not available", "sorry", "try another"]):
         selected_requests.pop(reply_to_id, None)
         await client.send_message(
@@ -179,16 +184,14 @@ async def handle_music_reply_handler(client, message):
         )
         return
 
-    # Now handle Audio with stored caption (if available)
+    # Handle audio without saving any caption
     if message.audio:
-        info = selected_requests.pop(reply_to_id, None)
-        caption = "**🎵 Here's your song:**"
-
+        selected_requests.pop(reply_to_id, None)
         try:
             await client.send_audio(
                 chat_id=user_id,
                 audio=message.audio.file_id,
-                caption=caption,
+                caption="🎵",
                 reply_to_message_id=reply_to_msg_id
             )
         except Exception as e:
