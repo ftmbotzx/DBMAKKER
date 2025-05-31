@@ -174,16 +174,18 @@ async def handle_trackid_click(client, callback_query):
 
 
 @Client.on_message(filters.chat(USERBOT_CHAT_ID) & filters.reply)
-async def bot_reply_handler(client, message):
+async def bot_reply_handler(client, message: Message):
+    # Log the incoming message text or caption
+    logging.info(f"📩 Userbot reply received | From: {message.from_user.id} | Text: {message.text or message.caption or 'No text'}")
+
     reply_to_msg = message.reply_to_message
-    reply_to_id = reply_to_msg.id  # This is the message sent to USERBOT_CHAT_ID
+    reply_to_id = reply_to_msg.id  # Message sent to USERBOT_CHAT_ID
 
     user_data = message_map.get(reply_to_id)
     if not user_data:
         return
 
     user_id, original_msg_id, wait_msg_id = user_data
-
     url = getattr(reply_to_msg, "text", None) or getattr(reply_to_msg, "caption", None) or "URL Not Found"
 
     try:
@@ -195,11 +197,9 @@ async def bot_reply_handler(client, message):
                 reply_to_message_id=original_msg_id,
                 caption="🎧 **Here is your Spotify track!**\n\n🎶 Enjoy your music.\n\nProvided by @Ans_Bots"
             )
-
         elif message.text:
             await client.send_message(chat_id=user_id, text=message.text)
 
-        # Clean-up: delete "wait" message
         if wait_msg_id:
             try:
                 await client.delete_messages(chat_id=user_id, message_ids=[wait_msg_id])
