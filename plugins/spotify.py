@@ -168,7 +168,7 @@ async def handle_userbot_audio(client, message):
 
 @Client.on_message(filters.chat(USERBOT_CHAT_ID) & filters.text)
 async def handle_userbot_text(client, message):
-    text = message.text.lower()
+    text = message.text
     reply_id = message.reply_to_message_id
 
     info = selected_requests.get(reply_id)
@@ -176,7 +176,7 @@ async def handle_userbot_text(client, message):
         return
 
     # Forward the "🔍 Looking for" message to user
-    if text.startswith("🔍 looking for"):
+    if text.startswith("🔍 Looking for"):
         try:
             await client.forward_messages(
                 chat_id=info["user_id"],
