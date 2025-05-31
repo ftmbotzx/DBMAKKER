@@ -151,29 +151,14 @@ async def handle_trackid_click(client, callback_query):
         "status": "waiting"
     }
 
-@Client.on_message(filters.chat(USERBOT_CHAT_ID) & filters.reply)
+@client.on_message(filters.chat(USERBOT_CHAT_ID) & filters.reply)
 async def handle_userbot_reply(client, message):
-    # This is a reply from userbot to the track message we sent
-    reply_to_msg = message.reply_to_message
-    if not reply_to_msg:
-        return
-    
-    original_msg_id = reply_to_msg.id
-    
-    # Check if this original message is in selected_requests
-    request_data = selected_requests.get(original_msg_id)
-    if not request_data:
-        return
-
-    user_id = request_data["user_id"]
-    
-    # Forward userbot's reply text or message to original user
-    try:
+    # message.reply_to_message = wo message jisko userbot ne reply kiya hai
+    reply_to_msg_id = message.reply_to_message.id
+    if reply_to_msg_id in selected_requests:
+        user_id = selected_requests[reply_to_msg_id]['user_id']
         await client.send_message(user_id, message.text)
-        # Optionally update the status
-        selected_requests[original_msg_id]["status"] = "replied"
-    except Exception as e:
-        logging.error(f"Failed to forward userbot reply to user: {e}")
+
 
 
 def extract_track_info(spotify_url: str):
