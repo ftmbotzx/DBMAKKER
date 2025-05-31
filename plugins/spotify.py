@@ -18,8 +18,26 @@ client_secret = "60b4007a8b184727829670e2e0f911ca"
 auth_manager = SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
 sp = spotipy.Spotify(auth_manager=auth_manager)
 
-song_cache = {}  # {message_id: {"songs": [...], "track_ids": [...]}}
-selected_requests = {}  # {userbot_msg_id: {"user_id": ..., "reply_to": ...}}
+song_cache = {}
+
+def extract_track_info(spotify_url: str):
+    parsed = urlparse(spotify_url)
+    
+    if "track" not in parsed.path:
+        logging.warning("URL does not contain 'track' in path. Returning None.")
+        return None
+
+    track_id = parsed.path.split("/")[-1].split("?")[0]
+    try:
+        result = sp.track(track_id)
+    except Exception as e:
+        logging.error(f"Error fetching track info from Spotify API: {e}")
+        return None
+
+    title = result['name']
+    artist = result['artists'][0]['name']
+    
+    return title.lower(), artist.lower()
 
 def get_playlist_info(playlist_url):
     playlist_id = playlist_url.split("/")[-1].split("?")[0]
@@ -123,6 +141,10 @@ async def handle_noop(client, callback_query):
     await callback_query.answer("🎵 Downloading soon...", show_alert=False)
 
 # --- Track Selection Callback Handler ---
+from pyrogram.types import Message
+
+message_map = {}
+
 @Client.on_callback_query(filters.regex("trackid:"))
 async def handle_trackid_click(client, callback_query):
     track_id = callback_query.data.split(":")[1]
@@ -142,54 +164,51 @@ async def handle_trackid_click(client, callback_query):
     await callback_query.answer(f"🎵 Sending {song_name}")
 
     spotify_url = f"https://open.spotify.com/track/{track_id}"
+
+    wait_msg = await client.send_message(user_id, "🔄 **Please wait... fetching your song.**")
+    
+    # Send track URL to USERBOT_CHAT_ID
     sent = await client.send_message(USERBOT_CHAT_ID, spotify_url)
 
-    # Save track request data
-    selected_requests[sent.id] = {
-        "user_id": user_id,
-        "reply_to": msg_id,
-        "status": "waiting"
-    }
+    # Map the user with the reply message id
+    message_map[sent.id] = (user_id, callback_query.message.id, wait_msg.id)
+
+
 
 @Client.on_message(filters.chat(USERBOT_CHAT_ID) & filters.reply)
-async def userbot_reply_handler(client, message):
-    # Userbot ka reply message
-    
-    # Reply jis message pe kiya gaya
-    replied_msg = message.reply_to_message
-    if not replied_msg:
+async def bot_reply_handler(client, message: Message):
+    reply_to_msg = message.reply_to_message
+    reply_to_id = reply_to_msg.id  # This is the message sent to USERBOT_CHAT_ID
+
+    user_data = message_map.get(reply_to_id)
+    if not user_data:
         return
 
-    # Check if original userbot message id hai selected_requests mein
-    req = selected_requests.get(replied_msg.id)
-    if not req:
-        return
-    
-    original_user_id = req["user_id"]
-    
-    # Ab userbot ka reply message original user ko bhejo
-    await client.send_message(original_user_id, message.text)
-    
-    # Status update kar lo
-    selected_requests[replied_msg.id]["status"] = "replied"
+    user_id, original_msg_id, wait_msg_id = user_data
 
+    url = getattr(reply_to_msg, "text", None) or getattr(reply_to_msg, "caption", None) or "URL Not Found"
 
-
-def extract_track_info(spotify_url: str):
-    parsed = urlparse(spotify_url)
-    
-    if "track" not in parsed.path:
-        logging.warning("URL does not contain 'track' in path. Returning None.")
-        return None
-
-    track_id = parsed.path.split("/")[-1].split("?")[0]
     try:
-        result = sp.track(track_id)
-    except Exception as e:
-        logging.error(f"Error fetching track info from Spotify API: {e}")
-        return None
+        if message.media:
+            await client.copy_message(
+                chat_id=user_id,
+                from_chat_id=USERBOT_CHAT_ID,
+                message_id=message.id,
+                reply_to_message_id=original_msg_id,
+                caption="🎧 **Here is your Spotify track!**\n\n🎶 Enjoy your music.\n\nProvided by @Ans_Bots"
+            )
 
-    title = result['name']
-    artist = result['artists'][0]['name']
-    
-    return title.lower(), artist.lower()
+        elif message.text:
+            await client.send_message(chat_id=user_id, text=message.text)
+
+        # Clean-up: delete "wait" message
+        if wait_msg_id:
+            try:
+                await client.delete_messages(chat_id=user_id, message_ids=[wait_msg_id])
+            except Exception as e:
+                logging.warning(f"Couldn't delete wait message for {user_id}: {e}")
+
+        del message_map[reply_to_id]
+
+    except Exception as e:
+        await client.send_message(LOG_CHANNEL, f"❌ Error delivering Spotify file\n🔗 {url}\n**Error:** `{str(e)}`")
