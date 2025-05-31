@@ -151,13 +151,27 @@ async def handle_trackid_click(client, callback_query):
         "status": "waiting"
     }
 
-@client.on_message(filters.chat(USERBOT_CHAT_ID) & filters.reply)
-async def handle_userbot_reply(client, message):
-    # message.reply_to_message = wo message jisko userbot ne reply kiya hai
-    reply_to_msg_id = message.reply_to_message.id
-    if reply_to_msg_id in selected_requests:
-        user_id = selected_requests[reply_to_msg_id]['user_id']
-        await client.send_message(user_id, message.text)
+@Client.on_message(filters.chat(USERBOT_CHAT_ID) & filters.reply)
+async def userbot_reply_handler(client, message):
+    # Userbot ka reply message
+    
+    # Reply jis message pe kiya gaya
+    replied_msg = message.reply_to_message
+    if not replied_msg:
+        return
+
+    # Check if original userbot message id hai selected_requests mein
+    req = selected_requests.get(replied_msg.id)
+    if not req:
+        return
+    
+    original_user_id = req["user_id"]
+    
+    # Ab userbot ka reply message original user ko bhejo
+    await client.send_message(original_user_id, message.text)
+    
+    # Status update kar lo
+    selected_requests[replied_msg.id]["status"] = "replied"
 
 
 
