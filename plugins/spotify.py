@@ -148,20 +148,21 @@ from pyrogram.types import InputMediaAudio
 
 import aiohttp
 
+
+
 async def get_song_download_url(song_title, artist_name):
     query = f"{song_title}"
 
-    api_url = f"https://jiosaavn.funtoonsmultimedia.workers.dev/api/search/songs?query={query}"
+    api_url = f"https://ftm-saavn.vercel.app/song/?query={query}"
 
     async with aiohttp.ClientSession() as session:
         async with session.get(api_url) as resp:
             if resp.status == 200:
                 data = await resp.json()
-                results = data.get("data", {}).get("results", [])
 
-                if results:
-                    first_result = results[0]
-                    song_name = first_result.get("name")
+                if isinstance(data, list) and data:
+                    first_result = data[0]
+                    song_name = first_result.get("song")
                     download_url = first_result.get("downloadUrl")
                     return song_name, download_url
                 else:
