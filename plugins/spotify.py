@@ -162,7 +162,7 @@ async def get_song_download_url(song_title, artist_name):
                 if results:
                     first_result = results[0]
                     song_name = first_result.get("name")
-                    download_url = first_result.get("url")
+                    download_url = first_result.get("downloadUrl")
                     return song_name, download_url
                 else:
                     return None, None
