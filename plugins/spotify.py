@@ -150,10 +150,12 @@ import aiohttp
 
 
 
-async def get_song_download_url(song_title, artist_name):
-    query = f"{song_title}"
+import aiohttp
 
-    api_url = f"https://ftm-saavn.vercel.app/song/?query={query}"
+async def get_song_download_url(song_title, artist_name):
+    query = song_title
+
+    api_url = f"https://saavnapi-nine.vercel.app/song/?query={query}"
 
     async with aiohttp.ClientSession() as session:
         async with session.get(api_url) as resp:
@@ -161,14 +163,23 @@ async def get_song_download_url(song_title, artist_name):
                 data = await resp.json()
 
                 if isinstance(data, list) and data:
-                    first_result = data[0]
-                    song_name = first_result.get("song")
-                    download_url = first_result.get("downloadUrl")
-                    return song_name, download_url
+                    # Match try karo har item se
+                    for item in data:
+                        song_name = item.get("song", "").lower()
+                        primary_artists = item.get("primary_artists", "").lower()
+
+                        # Song aur artist match check
+                        if song_title.lower() in song_name and artist_name.lower() in primary_artists:
+                            return item.get("song"), item.get("media_url")
+
+                    # Agar exact match nahi toh pehla result fallback
+                    first = data[0]
+                    return first.get("song"), first.get("media_url")
                 else:
                     return None, None
             else:
                 return None, None
+
 
 
 @Client.on_callback_query(filters.regex("trackid:"))
