@@ -10,7 +10,6 @@ import logging
 import os
 from utils import safe_filename, download_with_aria2c, get_song_download_url_by_spotify_url, download_thumbnail
 import random
-import time
 import asyncio
 
 logging.basicConfig(level=logging.INFO)
@@ -28,37 +27,14 @@ song_cache = {}
 output_dir = os.path.join(os.getcwd(), "downloads")
 os.makedirs(output_dir, exist_ok=True)
 
+# --- Concurrency control: one request at a time per user ---
 
-# --- Rate limiting and concurrency control ---
-
-user_request_times = {}  # user_id: list of timestamps
-user_locks = {}         # user_id: asyncio.Lock()
-
-def can_user_request(user_id: int) -> bool:
-    now = time.time()
-    window = 30  # seconds
-    max_requests = 2
-
-    times = user_request_times.get(user_id, [])
-    # Remove timestamps older than window
-    times = [t for t in times if now - t < window]
-    user_request_times[user_id] = times
-
-    if len(times) >= max_requests:
-        return False
-    return True
-
-def add_user_request(user_id: int):
-    now = time.time()
-    if user_id not in user_request_times:
-        user_request_times[user_id] = []
-    user_request_times[user_id].append(now)
+user_locks = {}
 
 async def get_user_lock(user_id: int) -> asyncio.Lock:
     if user_id not in user_locks:
         user_locks[user_id] = asyncio.Lock()
     return user_locks[user_id]
-
 
 # --- Spotify info extraction functions ---
 
@@ -136,26 +112,18 @@ def generate_keyboard(song_list, track_ids, page=0, per_page=8):
     return InlineKeyboardMarkup(buttons)
 
 
-# --- Main Message Handler with rate limiting & concurrency ---
+# --- Main Message Handler with concurrency lock ---
 
 @Client.on_message(filters.private & filters.text)
 async def handle_spotify_link(client, message):
     user_id = message.from_user.id
 
-    # Rate limit check
-    if not can_user_request(user_id):
-        await message.reply("⚠️ You can only make 2 requests every 30 seconds. Please wait before trying again.")
-        return
-
-    # Concurrency lock check
     lock = await get_user_lock(user_id)
     if lock.locked():
         await message.reply("⚠️ You already have a request running. Please wait for it to finish.")
         return
 
     async with lock:
-        add_user_request(user_id)
-
         text = message.text.strip()
 
         playlist_pattern = r"https?://open\.spotify\.com/playlist/[a-zA-Z0-9]+"
@@ -294,15 +262,11 @@ async def handle_noop(client, callback_query):
     await callback_query.answer("🎵 Downloading soon...", show_alert=False)
 
 
-# --- Track ID Callback Handler with rate limiting & concurrency ---
+# --- Track ID Callback Handler with concurrency lock ---
 
 @Client.on_callback_query(filters.regex("trackid:"))
 async def handle_trackid_click(client, callback_query):
     user_id = callback_query.from_user.id
-
-    if not can_user_request(user_id):
-        await callback_query.answer("⚠️ Rate limit exceeded: max 2 requests per 30 seconds.", show_alert=True)
-        return
 
     lock = await get_user_lock(user_id)
     if lock.locked():
@@ -310,8 +274,6 @@ async def handle_trackid_click(client, callback_query):
         return
 
     async with lock:
-        add_user_request(user_id)
-
         track_id = callback_query.data.split(":")[1]
         spotify_url = f"https://open.spotify.com/track/{track_id}"
 
