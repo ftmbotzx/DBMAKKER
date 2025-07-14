@@ -349,7 +349,7 @@ async def handle_spotify_link(client, message):
                 photo="thumb.jpg",
                 caption=f"🎧 **Playlist**: {name}\n📀 Total Songs: {len(songs)}\n\n🎵 Select a song below:"
             )
-            keyboard = generate_keyboard(songs, track_ids, page=0, playlist_message_id=user_id)
+            keyboard = generate_keyboard(songs, track_ids, page=0, playlist_message_id=reply.id)
             await reply.edit_reply_markup(reply_markup=keyboard)
 
             song_cache[reply.id] = {"songs": songs, "track_ids": track_ids, "playlist_message_id": reply.id}
