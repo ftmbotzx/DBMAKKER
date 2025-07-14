@@ -13,42 +13,44 @@ def safe_filename(name: str) -> str:
     """Remove unsafe filesystem characters from a filename."""
     return re.sub(r'[\\/*?:"<>|]', '_', name)
 
-async def download_with_aria2c(url: str, output_dir: str, filename: str) -> bool:
-    """
-    Download a file asynchronously using aria2c CLI.
-    Returns True if download succeeded, False otherwise.
-    """
-    cmd = [
-        "aria2c",
-        "-x", "16",
-        "-s", "16",
-        "-k", "1M",
-        "--max-tries=5",
-        "--timeout=60",
-        "--check-certificate=false",  # agar SSL issues hain toh
-        "-d", output_dir,
-        "-o", filename,
-        url
-    ]
-    logger.info(f"Running command: {' '.join(cmd)}")
+import asyncio
 
-    process = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    stdout, stderr = await process.communicate()
+# ek hi waqt mein max 2 downloads chalu honge
+aria2c_semaphore = asyncio.Semaphore(2)
 
-    logger.info(f"aria2c STDOUT:\n{stdout.decode().strip()}")
-    logger.info(f"aria2c STDERR:\n{stderr.decode().strip()}")
+async def download_with_aria2c(url, output_dir, filename):
+    async with aria2c_semaphore:
+        cmd = [
+            "aria2c",
+            "-x", "4",
+            "-s", "4",
+            "-k", "1M",
+            "--max-tries=5",
+            "--retry-wait=5",
+            "--timeout=60",
+            "--user-agent=Mozilla/5.0",
+            "-d", output_dir,
+            "-o", filename,
+            url
+        ]
+        logger.info(f"Running command: {' '.join(cmd)}")
 
-    if process.returncode == 0:
-        full_path = os.path.join(output_dir, filename)
-        logger.info(f"aria2c download succeeded: {full_path}")
-        return True
-    else:
-        logger.error(f"aria2c failed with exit code {process.returncode}")
-        return False
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await process.communicate()
+
+        logger.info(f"aria2c STDOUT:\n{stdout.decode().strip()}")
+        logger.info(f"aria2c STDERR:\n{stderr.decode().strip()}")
+
+        if process.returncode == 0:
+            logger.info(f"aria2c download succeeded: {os.path.join(output_dir, filename)}")
+            return True
+        else:
+            logger.error(f"aria2c failed with exit code {process.returncode}")
+            return False
 
 async def get_song_download_url_by_spotify_url(spotify_url: str):
     """
