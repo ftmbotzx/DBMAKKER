@@ -71,3 +71,24 @@ async def get_song_download_url_by_spotify_url(spotify_url: str):
             else:
                 logger.error(f"API request failed with status code: {resp.status}")
                 return None, None
+
+
+
+
+async def download_thumbnail(thumb_url: str, output_path: str) -> bool:
+    if not thumb_url:
+        return False
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(thumb_url) as resp:
+                if resp.status == 200:
+                    with open(output_path, "wb") as f:
+                        f.write(await resp.read())
+                    logging.info(f"Thumbnail downloaded to {output_path}")
+                    return True
+    except Exception as e:
+        logging.error(f"Thumbnail download failed: {e}")
+
+    return False
+
