@@ -58,10 +58,10 @@ async def download_with_aria2c(url, output_dir, filename):
 logger = logging.getLogger(__name__)
 
 async def get_song_download_url_by_spotify_url(spotify_url: str):
-    encoded_url = urllib.parse.quote(spotify_url)
+    logger.info(f"url {spotify_url}")
     api_urls = [
-        f"https://tet-kpy4.onrender.com/spotify?url={encoded_url}",
-        f"https://tet-kpy4.onrender.com/spotify2?url={encoded_url}"
+        f"https://tet-kpy4.onrender.com/spotify?url={spotify_url}",
+        f"https://tet-kpy4.onrender.com/spotify2?url={spotify_url}"
     ]
 
     random.shuffle(api_urls)  # Shuffle for fair chance
