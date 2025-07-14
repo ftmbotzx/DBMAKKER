@@ -163,7 +163,7 @@ async def handle_download_all(client, callback_query):
     user_id = callback_query.from_user.id
     playlist_message_id = callback_query.from_user.id
 
-    data = song_cache.get(playlist_message_id)
+    data = song_cache.get(message_id)
     if not data:
         logging.info(f"data {song_cache} ")
         logging.info(f"take it data {data} //  {user_id} /// {message_id} ")
@@ -352,7 +352,7 @@ async def handle_spotify_link(client, message):
             keyboard = generate_keyboard(songs, track_ids, page=0, playlist_message_id=user_id)
             await reply.edit_reply_markup(reply_markup=keyboard)
 
-            song_cache[user_id] = {"songs": songs, "track_ids": track_ids, "playlist_message_id": user_id}
+            song_cache[reply.id] = {"songs": songs, "track_ids": track_ids, "playlist_message_id": reply.id}
         except Exception as e:
             await message.reply(f"⚠️ Error: {e}")
 
