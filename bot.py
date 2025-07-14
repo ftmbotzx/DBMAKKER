@@ -17,7 +17,7 @@ from pyrogram.raw.all import layer
 from plugins import web_server
 from info import SESSION, API_ID, API_HASH, BOT_TOKEN, LOG_CHANNEL, PORT, USER_SESSION, ADMINS
 from plugins.spotify import extract_track_info
-from utils import download_worker
+
 # Logging setup
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("pyrogram").setLevel(logging.ERROR)
@@ -50,7 +50,6 @@ class Bot(Client):
     async def start(self):
         await super().start()
         me = await self.get_me()
-        asyncio.create_task(download_worker())
         logging.info(f"🤖 {me.first_name} (@{me.username}) running on Pyrogram v{__version__} (Layer {layer})")
         tz = pytz.timezone('Asia/Kolkata')
         today = date.today()
