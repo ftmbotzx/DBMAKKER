@@ -447,7 +447,7 @@ async def handle_trackid_click(client, callback_query):
                 return
             except Exception as e:
                 # Forward failed (message deleted?), remove cache and continue
-                print(f"Forward failed: {e}")
+                logging.info(f"Forward failed: {e}")
                 # Optionally remove from DB:
                 await db.col.delete_one({"track_id": track_id})
 
