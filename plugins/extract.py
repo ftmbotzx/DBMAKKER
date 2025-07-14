@@ -16,7 +16,7 @@ client_secret = "60b4007a8b184727829670e2e0f911ca"
 auth_manager = SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
 sp = spotipy.Spotify(auth_manager=auth_manager)
 
-app = Client("my_bot")  # Make sure to set session name
+app = Client
 
 def extract_artist_id(url):
     match = re.search(r"artist/([a-zA-Z0-9]+)", url)
