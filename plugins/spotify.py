@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 from info import USERBOT_CHAT_ID
 import logging
 import urllib.parse
-from utils import safe_filename, download_with_aria2c, get_song_download_url_by_spotify_url
+from utils import safe_filename, download_with_aria2c, get_song_download_url_by_spotify_url, download_thumbnail
 import os
 
 logging.basicConfig(level=logging.INFO)
@@ -200,20 +200,9 @@ async def handle_trackid_click(client, callback_query):
         await wait_msg.edit("❌ Downloaded file not found.")
         return
 
-    # ---- Download the thumbnail ----
+    # ---- Download the thumbnail using helper ----
     thumb_path = os.path.join(output_dir, safe_filename(song_title) + ".jpg")
-    thumb_success = False
-
-    if thumb_url:
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(thumb_url) as resp:
-                    if resp.status == 200:
-                        with open(thumb_path, "wb") as f:
-                            f.write(await resp.read())
-                        thumb_success = True
-        except Exception as e:
-            thumb_success = False
+    thumb_success = await download_thumbnail(thumb_url, thumb_path)
 
     # ---- Upload the audio with thumb if available ----
     try:
