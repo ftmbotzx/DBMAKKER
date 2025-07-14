@@ -426,12 +426,13 @@ async def handle_trackid_click(client, callback_query):
 
         await callback_query.answer("🎵 Fetching your song...")
 
-        # ✅ Check in dump channel by search
-        results = await client.search_messages(
+        results = []
+        async for msg in client.search_messages(
             chat_id=DUMP_CHANNEL_ID,
             query=track_id,
-            limit=1
-        )
+        ):
+            results.append(msg)
+            break  # bas pehla hi chahiye
 
         if results:
             dump_msg = results[0]
