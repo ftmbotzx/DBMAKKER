@@ -438,7 +438,7 @@ async def handle_trackid_click(client, callback_query):
         dump_file_id = await db.get_dump_file_id(track_id)
         if dump_file_id:
             try:
-                await client.forward_messages(
+                await client.send_audio(
                     user_id,
                     dump_file_id,
                     caption=f"🎵 **{title}**\n👤 {artist}")
