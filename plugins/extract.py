@@ -2,6 +2,14 @@ from pyrogram import Client, filters
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 import re
+import logging
+
+# ✅ Logging setup
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 client_id = "feef7905dd374fd58ba72e08c0d77e70"
 client_secret = "60b4007a8b184727829670e2e0f911ca"
@@ -9,7 +17,6 @@ auth_manager = SpotifyClientCredentials(client_id=client_id, client_secret=clien
 sp = spotipy.Spotify(auth_manager=auth_manager)
 
 app = Client
-
 def extract_artist_id(url):
     match = re.search(r"artist/([a-zA-Z0-9]+)", url)
     if match:
@@ -19,7 +26,7 @@ def extract_artist_id(url):
 @app.on_message(filters.command("ar") & filters.private)
 async def artist_songs(client, message):
     if len(message.command) < 2:
-        await message.reply("Please send artist Spotify link.\nUsage: /artist_songs <artist_spotify_link>")
+        await message.reply("Please send artist Spotify link.\nUsage: /ar <artist_spotify_link>")
         return
 
     artist_url = message.command[1]
@@ -36,12 +43,12 @@ async def artist_songs(client, message):
         results = sp.artist_albums(artist_id, album_type='album,single', country='IN', limit=50)
         albums_india.extend(results['items'])
 
-        print(f"Fetched {len(albums_india)} India albums so far...")
+        logger.info(f"Fetched {len(albums_india)} India albums so far...")
 
         while results['next']:
             results = sp.next(results)
             albums_india.extend(results['items'])
-            print(f"Fetched {len(albums_india)} India albums so far...")
+            logger.info(f"Fetched {len(albums_india)} India albums so far...")
 
         india_album_ids = set(album['id'] for album in albums_india)
 
@@ -59,12 +66,12 @@ async def artist_songs(client, message):
         results_global = sp.artist_albums(artist_id, album_type='album,single', limit=50)
         albums_global.extend(results_global['items'])
 
-        print(f"Fetched {len(albums_global)} Global albums so far...")
+        logger.info(f"Fetched {len(albums_global)} Global albums so far...")
 
         while results_global['next']:
             results_global = sp.next(results_global)
             albums_global.extend(results_global['items'])
-            print(f"Fetched {len(albums_global)} Global albums so far...")
+            logger.info(f"Fetched {len(albums_global)} Global albums so far...")
 
         global_album_ids = set(album['id'] for album in albums_global)
         total_albums_global = len(global_album_ids)
@@ -87,7 +94,10 @@ async def artist_songs(client, message):
             f"{log_info}"
         )
 
+        logger.info(f"Final log: {log_info}")
+
         await message.reply(reply_text)
 
     except Exception as e:
+        logger.error(f"Error occurred: {e}")
         await message.reply(f"❌ Error occurred: `{e}`")
