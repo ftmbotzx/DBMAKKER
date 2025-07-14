@@ -11,6 +11,8 @@ import os
 from utils import safe_filename, download_with_aria2c, get_song_download_url_by_spotify_url, download_thumbnail
 import random
 import asyncio
+from info import DUMP_CHANNEL_ID
+
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("pyrogram").setLevel(logging.ERROR)
@@ -30,6 +32,10 @@ os.makedirs(output_dir, exist_ok=True)
 # --- Concurrency control: one request at a time per user ---
 
 user_locks = {}
+
+
+dump_channel_cache = {}  # track_id => dump msg id
+
 
 async def get_user_lock(user_id: int) -> asyncio.Lock:
     if user_id not in user_locks:
@@ -403,7 +409,7 @@ async def handle_noop(client, callback_query):
     await callback_query.answer("🎵 Downloading soon...", show_alert=False)
 
 
-# --- Track ID Callback Handler with concurrency lock ---
+
 
 @Client.on_callback_query(filters.regex("trackid:"))
 async def handle_trackid_click(client, callback_query):
@@ -420,7 +426,21 @@ async def handle_trackid_click(client, callback_query):
 
         await callback_query.answer("🎵 Fetching your song...")
 
-        # Extract title, artist, thumbnail URL from Spotify
+        # ✅ Step 1: Check in dump cache
+        if track_id in dump_channel_cache:
+            dump_msg_id = dump_channel_cache[track_id]
+            try:
+                await client.forward_messages(
+                    chat_id=user_id,
+                    from_chat_id=DUMP_CHANNEL_ID,
+                    message_ids=dump_msg_id
+                )
+                return  # done!
+            except Exception:
+                # maybe deleted from dump, remove cache & proceed to download
+                dump_channel_cache.pop(track_id)
+
+        # Step 2: Fetch song info
         track_info = extract_track_info(spotify_url)
         if not track_info:
             await client.send_message(user_id, "⚠️ Failed to fetch track info.")
@@ -445,19 +465,14 @@ async def handle_trackid_click(client, callback_query):
         safe_name = f"{base_name}_{unique_number}.mp3"
         download_path = os.path.join(output_dir, safe_name)
 
-
         await wait_msg.edit(f"⬇️ Downloading **{song_title}**...")
 
         success = await download_with_aria2c(song_url, output_dir, safe_name)
-        if not success:
+        if not success or not os.path.exists(download_path):
             await wait_msg.edit("❌ Failed to download the song.")
             return
 
-        if not os.path.exists(download_path):
-            await wait_msg.edit("❌ Downloaded file not found.")
-            return
-
-        # Download the thumbnail
+        # Download thumbnail
         thumb_path = os.path.join(output_dir, safe_filename(song_title) + ".jpg")
         logging.info(f"download path {thumb_path}")
         thumb_success = await download_thumbnail(thumb_url, thumb_path)
@@ -465,8 +480,9 @@ async def handle_trackid_click(client, callback_query):
         try:
             await wait_msg.edit(f"📤 Uploading **{song_title}**...")
 
+            # Send audio to user
             if thumb_success and os.path.exists(thumb_path):
-                await client.send_audio(
+                sent_msg = await client.send_audio(
                     user_id,
                     download_path,
                     caption=f"🎵 **{song_title}**\n👤 {artist}",
@@ -475,7 +491,7 @@ async def handle_trackid_click(client, callback_query):
                     performer=artist
                 )
             else:
-                await client.send_audio(
+                sent_msg = await client.send_audio(
                     user_id,
                     download_path,
                     caption=f"🎵 **{song_title}**\n👤 {artist}",
@@ -483,9 +499,21 @@ async def handle_trackid_click(client, callback_query):
                     performer=artist
                 )
 
+            # ✅ Step 3: send same audio to dump channel & save message id
+            dump_msg = await client.send_audio(
+                DUMP_CHANNEL_ID,
+                download_path,
+                caption=f"🎵 **{song_title}**\n👤 {artist}",
+                thumb=thumb_path if thumb_success and os.path.exists(thumb_path) else None,
+                title=song_title,
+                performer=artist
+            )
+            dump_channel_cache[track_id] = dump_msg.message_id
+
             await wait_msg.delete()
 
         except Exception as e:
+            logging.error(f"Error sending audio: {e}")
             await wait_msg.edit("⚠️ Failed to send the song file.")
 
         finally:
