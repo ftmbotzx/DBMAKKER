@@ -436,7 +436,7 @@ async def handle_trackid_click(client, callback_query):
 
         # --- Step 1: Check DB cache for dump_msg_id ---
         dump_file_id = await db.get_dump_msg_id(track_id)
-        if dump_msg_id:
+        if dump_file_id:
             try:
                 await client.forward_messages(
                     chat_id=user_id,
