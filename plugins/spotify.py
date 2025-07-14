@@ -24,8 +24,6 @@ sp = spotipy.Spotify(auth_manager=auth_manager)
 
 song_cache = {}
 
-safe_name = safe_filename(song_title) + ".mp3"
-output_dir = "/downloads"
 
 
 
@@ -183,6 +181,9 @@ async def handle_trackid_click(client, callback_query):
 
     download_path = os.path.join(output_dir, safe_name)
     await wait_msg.edit(f"⬇️ Downloading **{song_title}**...")
+    safe_name = safe_filename(song_title) + ".mp3"
+    output_dir = "/downloads"
+
     success = await download_with_aria2c(song_url, output_dir, safe_name)
     if not success:
         await wait_msg.edit("❌ Failed to download the song.")
