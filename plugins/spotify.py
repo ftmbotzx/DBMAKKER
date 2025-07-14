@@ -13,7 +13,6 @@ import random
 import asyncio
 from info import DUMP_CHANNEL_ID
 
-
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("pyrogram").setLevel(logging.ERROR)
 
