@@ -160,7 +160,8 @@ import asyncio
 @Client.on_callback_query(filters.regex(r"downloadall:(\d+)"))
 async def handle_download_all(client, callback_query):
     message_id = int(callback_query.data.split(":")[1])
-    user_id, playlist_message_id = callback_query.from_user.id
+    user_id = callback_query.from_user.id
+    playlist_message_id = callback_query.from_user.id
 
     data = song_cache.get(playlist_message_id)
     if not data:
