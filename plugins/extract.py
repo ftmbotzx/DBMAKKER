@@ -4,11 +4,7 @@ from spotipy.oauth2 import SpotifyClientCredentials
 import re
 import logging
 
-# ✅ Logging setup
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 client_id = "feef7905dd374fd58ba72e08c0d77e70"
@@ -37,85 +33,79 @@ async def artist_songs(client, message):
         await message.reply("Invalid Spotify artist link. Please send a correct link.")
         return
 
-    await message.reply("Fetching artist's songs and albums data for India, please wait...")
+    await message.reply("Fetching detailed song data, please wait...")
 
     try:
-        albums_india = []
-        results = sp.artist_albums(artist_id, album_type='album,single', country='IN', limit=50)
-        albums_india.extend(results['items'])
-
-        logger.info(f"Fetched {len(albums_india)} India albums so far...")
-
-        while results['next']:
-            results = sp.next(results)
-            albums_india.extend(results['items'])
-            logger.info(f"Fetched {len(albums_india)} India albums so far...")
-
-        india_album_ids = set(album['id'] for album in albums_india)
-
-        track_ids = set()
-        for album_id in india_album_ids:
-            tracks = sp.album_tracks(album_id)
-            for track in tracks['items']:
-                track_ids.add(track['id'])
-
-        total_songs_india = len(track_ids)
-        total_albums_india = len(india_album_ids)
-
-        # Count original and non-original songs
-        original_count = 0
-        non_original_count = 0
         artist_name_lower = sp.artist(artist_id)['name'].lower()
 
-        for track_id in track_ids:
-            track = sp.track(track_id)
-            artists = [artist['name'].lower() for artist in track['artists']]
-            main_artist = artists[0]
+        # Albums
+        albums = []
+        results_albums = sp.artist_albums(artist_id, album_type='album', limit=50)
+        albums.extend(results_albums['items'])
+        while results_albums['next']:
+            results_albums = sp.next(results_albums)
+            albums.extend(results_albums['items'])
+        album_ids = set(album['id'] for album in albums)
 
+        # Singles
+        singles = []
+        results_singles = sp.artist_albums(artist_id, album_type='single', limit=50)
+        singles.extend(results_singles['items'])
+        while results_singles['next']:
+            results_singles = sp.next(results_singles)
+            singles.extend(results_singles['items'])
+        single_ids = set(single['id'] for single in singles)
+
+        # Track details holders
+        album_tracks = set()
+        single_tracks = set()
+
+        # Fetch tracks in albums
+        for album_id in album_ids:
+            tracks = sp.album_tracks(album_id)
+            for track in tracks['items']:
+                album_tracks.add(track['id'])
+
+        # Fetch tracks in singles
+        for single_id in single_ids:
+            tracks = sp.album_tracks(single_id)
+            for track in tracks['items']:
+                single_tracks.add(track['id'])
+
+        # Combine all tracks (unique)
+        all_tracks = album_tracks.union(single_tracks)
+
+        # Count originals and non-originals in all tracks
+        original_count = 0
+        non_original_count = 0
+
+        for track_id in all_tracks:
+            track = sp.track(track_id)
+            artists = [a['name'].lower() for a in track['artists']]
+            main_artist = artists[0]
             if artist_name_lower in artists:
                 if main_artist == artist_name_lower:
                     original_count += 1
                 else:
                     non_original_count += 1
 
-        # Global albums
-        albums_global = []
-        results_global = sp.artist_albums(artist_id, album_type='album,single', limit=50)
-        albums_global.extend(results_global['items'])
-
-        logger.info(f"Fetched {len(albums_global)} Global albums so far...")
-
-        while results_global['next']:
-            results_global = sp.next(results_global)
-            albums_global.extend(results_global['items'])
-            logger.info(f"Fetched {len(albums_global)} Global albums so far...")
-
-        global_album_ids = set(album['id'] for album in albums_global)
-        total_albums_global = len(global_album_ids)
-
-        artist_info = sp.artist(artist_id)
-        artist_name = artist_info['name']
-
-        log_info = (
-            f"🔍 Log Info:\n"
-            f"India Albums Fetched: {total_albums_india}\n"
-            f"Global Albums Fetched: {total_albums_global}\n"
-            f"Unique Songs in India: {total_songs_india}\n"
-            f"Original Songs (Primary Artist): {original_count}\n"
-            f"Other Songs (Featuring/Remix/Collab): {non_original_count}"
-        )
+        total_songs = len(all_tracks)
+        total_album_tracks = len(album_tracks)
+        total_single_tracks = len(single_tracks)
+        total_albums = len(album_ids)
+        total_singles = len(single_ids)
 
         reply_text = (
-            f"👤 **Artist:** {artist_name}\n\n"
-            f"🌏 **Total Albums & Singles (Global):** {total_albums_global}\n"
-            f"🇮🇳 **Total Albums & Singles (India):** {total_albums_india}\n"
-            f"🎵 **Unique Songs in India:** {total_songs_india}\n"
-            f"🎤 **Original Songs (Primary Artist):** {original_count}\n"
-            f"🤝 **Other Songs (Featuring/Remix/Collab):** {non_original_count}\n\n"
-            f"{log_info}"
+            f"👤 **Artist:** {sp.artist(artist_id)['name']}\n\n"
+            f"📊 **Summary:**\n"
+            f"• Total Albums: {total_albums}\n"
+            f"• Total Singles: {total_singles}\n"
+            f"• Total Songs (Albums): {total_album_tracks}\n"
+            f"• Total Songs (Singles): {total_single_tracks}\n"
+            f"• Total Unique Songs (Albums + Singles): {total_songs}\n"
+            f"• Original Songs (Primary Artist): {original_count}\n"
+            f"• Other Songs (Featuring/Remix/Collab): {non_original_count}\n"
         )
-
-        logger.info(f"Final log: {log_info}")
 
         await message.reply(reply_text)
 
