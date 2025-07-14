@@ -178,10 +178,10 @@ async def handle_trackid_click(client, callback_query):
     if not song_url:
         await wait_msg.edit("❌ Song not found via API.")
         return
-
+    safe_name = safe_filename(song_title) + ".mp3"
     download_path = os.path.join(output_dir, safe_name)
     await wait_msg.edit(f"⬇️ Downloading **{song_title}**...")
-    safe_name = safe_filename(song_title) + ".mp3"
+
 
 
     success = await download_with_aria2c(song_url, output_dir, safe_name)
