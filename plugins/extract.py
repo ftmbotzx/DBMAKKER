@@ -16,7 +16,8 @@ client_secret = "60b4007a8b184727829670e2e0f911ca"
 auth_manager = SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
 sp = spotipy.Spotify(auth_manager=auth_manager)
 
-app = Client
+app = Client("my_bot")  # Make sure to set session name
+
 def extract_artist_id(url):
     match = re.search(r"artist/([a-zA-Z0-9]+)", url)
     if match:
@@ -61,6 +62,22 @@ async def artist_songs(client, message):
         total_songs_india = len(track_ids)
         total_albums_india = len(india_album_ids)
 
+        # Count original and non-original songs
+        original_count = 0
+        non_original_count = 0
+        artist_name_lower = sp.artist(artist_id)['name'].lower()
+
+        for track_id in track_ids:
+            track = sp.track(track_id)
+            artists = [artist['name'].lower() for artist in track['artists']]
+            main_artist = artists[0]
+
+            if artist_name_lower in artists:
+                if main_artist == artist_name_lower:
+                    original_count += 1
+                else:
+                    non_original_count += 1
+
         # Global albums
         albums_global = []
         results_global = sp.artist_albums(artist_id, album_type='album,single', limit=50)
@@ -83,14 +100,18 @@ async def artist_songs(client, message):
             f"🔍 Log Info:\n"
             f"India Albums Fetched: {total_albums_india}\n"
             f"Global Albums Fetched: {total_albums_global}\n"
-            f"Unique Songs in India: {total_songs_india}"
+            f"Unique Songs in India: {total_songs_india}\n"
+            f"Original Songs (Primary Artist): {original_count}\n"
+            f"Other Songs (Featuring/Remix/Collab): {non_original_count}"
         )
 
         reply_text = (
             f"👤 **Artist:** {artist_name}\n\n"
             f"🌏 **Total Albums & Singles (Global):** {total_albums_global}\n"
             f"🇮🇳 **Total Albums & Singles (India):** {total_albums_india}\n"
-            f"🎵 **Unique Songs in India:** {total_songs_india}\n\n"
+            f"🎵 **Unique Songs in India:** {total_songs_india}\n"
+            f"🎤 **Original Songs (Primary Artist):** {original_count}\n"
+            f"🤝 **Other Songs (Featuring/Remix/Collab):** {non_original_count}\n\n"
             f"{log_info}"
         )
 
