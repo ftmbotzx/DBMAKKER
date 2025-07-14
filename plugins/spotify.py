@@ -202,6 +202,7 @@ async def handle_trackid_click(client, callback_query):
 
     # ---- Download the thumbnail using helper ----
     thumb_path = os.path.join(output_dir, safe_filename(song_title) + ".jpg")
+    logging.info(f"download path {thumb_path}")
     thumb_success = await download_thumbnail(thumb_url, thumb_path)
 
     # ---- Upload the audio with thumb if available ----
