@@ -233,6 +233,6 @@ async def handle_trackid_click(client, callback_query):
 
     finally:
         if os.path.exists(download_path):
-            os.remove(download_path)
+
         if os.path.exists(thumb_path):
             os.remove(thumb_path)
