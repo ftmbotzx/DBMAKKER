@@ -411,6 +411,8 @@ async def handle_noop(client, callback_query):
 
 
 
+from db import db  # tera mongo class instance
+
 @Client.on_callback_query(filters.regex("trackid:"))
 async def handle_trackid_click(client, callback_query):
     user_id = callback_query.from_user.id
@@ -426,24 +428,25 @@ async def handle_trackid_click(client, callback_query):
 
         await callback_query.answer("🎵 Fetching your song...")
 
-        results = []
-        async for msg in client.search_messages(
-            chat_id=DUMP_CHANNEL_ID,
-            query=track_id,
-        ):
-            results.append(msg)
-            break  # bas pehla hi chahiye
+        # --- Step 1: Check DB cache for dump_msg_id ---
+        dump_msg_id = await db.get_dump_msg_id(track_id)
+        if dump_msg_id:
+            try:
+                await client.forward_messages(
+                    chat_id=user_id,
+                    from_chat_id=DUMP_CHANNEL_ID,
+                    message_ids=dump_msg_id
+                )
+                return
+            except Exception as e:
+                # Forward failed (message deleted?), remove cache and continue
+                print(f"Forward failed: {e}")
+                # Optionally remove from DB:
+                await db.col.delete_one({"track_id": track_id})
 
-        if results:
-            dump_msg = results[0]
-            await client.forward_messages(
-                chat_id=user_id,
-                from_chat_id=DUMP_CHANNEL_ID,
-                message_ids=dump_msg.id
-            )
-            return
+        # --- Step 2: Download flow ---
 
-        # Download if not found
+        # Extract track info
         track_info = extract_track_info(spotify_url)
         if not track_info:
             await client.send_message(user_id, "⚠️ Failed to fetch track info.")
@@ -498,10 +501,10 @@ async def handle_trackid_click(client, callback_query):
                     performer=artist
                 )
 
-            # ✅ dump channel mein fresh send with track_id
+            # --- Send to dump channel (fresh upload) ---
             dump_caption = f"🎵 **{song_title}**\n👤 {artist}\n🆔 {track_id}"
 
-            await client.send_audio(
+            dump_msg = await client.send_audio(
                 DUMP_CHANNEL_ID,
                 download_path,
                 caption=dump_caption,
@@ -509,6 +512,9 @@ async def handle_trackid_click(client, callback_query):
                 title=song_title,
                 performer=artist
             )
+
+            # --- Save to DB ---
+            await db.save_dump_msg_id(track_id, dump_msg.id)
 
             await wait_msg.delete()
 
