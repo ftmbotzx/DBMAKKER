@@ -232,7 +232,7 @@ async def handle_trackid_click(client, callback_query):
         await wait_msg.edit("⚠️ Failed to send the song file.")
 
     finally:
-
-
+        if os.path.exists(download_path):
+            os.remove(download_path)
         if os.path.exists(thumb_path):
             os.remove(thumb_path)
