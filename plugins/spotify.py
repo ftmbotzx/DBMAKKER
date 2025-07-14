@@ -280,7 +280,8 @@ async def handle_spotify_link(client, message):
                 with open("thumb.jpg", "wb") as f:
                     f.write(image_data)
 
-                keyboard = generate_keyboard(songs, track_ids, page=0)
+                keyboard = generate_keyboard(songs, track_ids, page=0, playlist_message_id=reply.id)
+
 
                 reply = await message.reply_photo(
                     photo="thumb.jpg",
