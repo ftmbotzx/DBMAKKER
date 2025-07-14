@@ -425,6 +425,12 @@ async def handle_trackid_click(client, callback_query):
     async with lock:
         track_id = callback_query.data.split(":")[1]
         spotify_url = f"https://open.spotify.com/track/{track_id}"
+        track_info = extract_track_info(spotify_url)
+        if not track_info:
+            await client.send_message(user_id, "⚠️ Failed to fetch track info.")
+            return
+
+        title, artist, thumb_url = track_info
 
         await callback_query.answer("🎵 Fetching your song...")
 
@@ -435,6 +441,7 @@ async def handle_trackid_click(client, callback_query):
                 await client.forward_messages(
                     chat_id=user_id,
                     from_chat_id=DUMP_CHANNEL_ID,
+                    caption=f"🎵 **{title}**\n👤 {artist}",
                     message_ids=dump_msg_id
                 )
                 return
