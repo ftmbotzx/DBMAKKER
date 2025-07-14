@@ -160,132 +160,51 @@ import os
 import asyncio
 import re
 import urllib.parse
-from pyrogram import Client, filters  # make sure you import your pyrogram Client and filters
+from pyrogram import Client, filters
 
-logger = logging.getLogger(__name__)
 
 def safe_filename(name: str) -> str:
-    # Remove unsafe filename chars from song title for filesystem
     return re.sub(r'[\\/*?:"<>|]', '_', name)
-
-async def download_with_aria2c(url: str, output_dir: str, filename: str) -> bool:
-    """
-    Download file using aria2c CLI asynchronously.
-    Returns True if download succeeded, else False.
-    """
-    cmd = [
-        "aria2c",
-        "-x", "16",
-        "-s", "16",
-        "-k", "1M",
-        "-d", output_dir,   # Directory to save the file
-        "-o", filename,     # Filename only
-        url
-    ]
-    logger.info(f"Starting aria2c download: {' '.join(cmd)}")
-
-    process = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    stdout, stderr = await process.communicate()
-
-    if process.returncode == 0:
-        full_path = os.path.join(output_dir, filename)
-        logger.info(f"aria2c download succeeded: {full_path}")
-        return True
-    else:
-        logger.error(f"aria2c download failed: {stderr.decode().strip()}")
-        return False
 
 @Client.on_callback_query(filters.regex("trackid:"))
 async def handle_trackid_click(client, callback_query):
     track_id = callback_query.data.split(":")[1]
     user_id = callback_query.from_user.id
 
-    logger.info(f"User {user_id} requested track ID: {track_id}")
+ 
 
     await callback_query.answer("🎵 Fetching your song...")
     wait_msg = await client.send_message(user_id, "🔄 Please wait... fetching your song.")
-
     spotify_url = f"https://open.spotify.com/track/{track_id}"
-    logger.info(f"Constructed Spotify URL: {spotify_url}")
 
     try:
         song_title, song_url = await get_song_download_url_by_spotify_url(spotify_url)
     except Exception as e:
-        logger.error(f"Error fetching song URL: {e}")
         await wait_msg.edit("⚠️ An error occurred while fetching the song.")
         return
-
     if not song_url:
-        logger.warning(f"Song not found for Spotify URL: {spotify_url}")
         await wait_msg.edit("❌ Song not found via API.")
         return
-
-    logger.info(f"Found song '{song_title}' with download URL: {song_url}")
-
     safe_name = safe_filename(song_title) + ".mp3"
     output_dir = "/tmp"
     download_path = os.path.join(output_dir, safe_name)
-
     await wait_msg.edit(f"⬇️ Downloading **{song_title}**...")
-
     success = await download_with_aria2c(song_url, output_dir, safe_name)
-
     if not success:
         await wait_msg.edit("❌ Failed to download the song.")
         return
-
     if not os.path.exists(download_path):
-        logger.error(f"File not found after aria2c download: {download_path}")
         await wait_msg.edit("❌ Downloaded file not found.")
         return
-
     try:
         await wait_msg.edit(f"📤 Uploading **{song_title}**...")
         await client.send_audio(user_id, download_path, caption=song_title)
         await wait_msg.delete()
     except Exception as e:
-        logger.error(f"Error sending song file: {e}")
         await wait_msg.edit("⚠️ Failed to send the song file.")
     finally:
         if os.path.exists(download_path):
             os.remove(download_path)
-            logger.info(f"Deleted temporary file: {download_path}")
 
-async def get_song_download_url_by_spotify_url(spotify_url: str):
-    encoded_url = urllib.parse.quote(spotify_url)
-    api_url = f"https://tet-kpy4.onrender.com/spotify?url={encoded_url}"
 
-    logger.info(f"Calling API: {api_url}")
-
-    async with aiohttp.ClientSession() as session:
-        async with session.get(api_url) as resp:
-            logger.info(f"API responded with status: {resp.status}")
-            if resp.status == 200:
-                data = await resp.json()
-                logger.debug(f"API response JSON: {data}")
-
-                if data.get("status") and "data" in data:
-                    song_data = data["data"]
-                    found_title = song_data.get("title")
-                    download_url = song_data.get("download")
-
-                    if download_url:
-                        # Encode download URL so spaces and special chars don't break links
-                        download_url_fixed = urllib.parse.quote(download_url, safe=':/?&=')
-                        logger.info(f"API returned song title: {found_title}")
-                        logger.info(f"Fixed download URL: {download_url_fixed}")
-                        return found_title, download_url_fixed
-                    else:
-                        logger.warning("Download URL missing in API response data.")
-                        return found_title, None
-                else:
-                    logger.warning(f"API response missing expected data or status is false: {data}")
-                    return None, None
-            else:
-                logger.error(f"API request failed with status code: {resp.status}")
-                return None, None
 
