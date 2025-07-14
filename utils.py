@@ -7,6 +7,8 @@ import os
 import re
 import urllib.parse
 
+import random
+
 logger = logging.getLogger(__name__)
 
 def safe_filename(name: str) -> str:
@@ -56,38 +58,42 @@ async def download_with_aria2c(url, output_dir, filename):
             return False
 
 
+logger = logging.getLogger(__name__)
+
 async def get_song_download_url_by_spotify_url(spotify_url: str):
-    """
-    Calls external API to get song info & download URL by Spotify track URL.
-    Returns (title, download_url) or (None, None) if failed.
-    """
     encoded_url = urllib.parse.quote(spotify_url)
-    api_url = f"https://tet-kpy4.onrender.com/spotify?url={encoded_url}"
+    api_urls = [
+        f"https://tet-kpy4.onrender.com/spotify?url={encoded_url}",
+        f"https://tet-kpy4.onrender.com/spotify2?url={encoded_url}"
+    ]
+
+    chosen_api = random.choice(api_urls)  # Randomly pick one API
 
     async with aiohttp.ClientSession() as session:
-        async with session.get(api_url) as resp:
-            if resp.status == 200:
-                data = await resp.json()
-                if data.get("status") and "data" in data:
-                    song_data = data["data"]
-                    found_title = song_data.get("title")
-                    download_url = song_data.get("download")
-                    logger.info(f"Download URL {download_url} ")
-                    if download_url:
-                        download_url_fixed = urllib.parse.quote(download_url, safe=':/?&=')
-                        return found_title, download_url_fixed
+        try:
+            async with session.get(chosen_api, timeout=10) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    if data.get("status") and "data" in data:
+                        song_data = data["data"]
+                        found_title = song_data.get("title")
+                        download_url = song_data.get("download")
+                        if download_url:
+                            download_url_fixed = urllib.parse.quote(download_url, safe=':/?&=')
+                            logger.info(f"Got download URL from {chosen_api}")
+                            return found_title, download_url_fixed
+                        else:
+                            logger.warning(f"No download URL in response from {chosen_api}")
+                            return found_title, None
                     else:
-                        logger.warning("Download URL missing in API response data.")
-                        return found_title, None
+                        logger.warning(f"Invalid response data from {chosen_api}: {data}")
+                        return None, None
                 else:
-                    logger.warning(f"API response missing expected data or status is false: {data}")
+                    logger.error(f"API request failed with status {resp.status} from {chosen_api}")
                     return None, None
-            else:
-                logger.error(f"API request failed with status code: {resp.status}")
-                return None, None
-
-
-
+        except Exception as e:
+            logger.error(f"Exception while requesting {chosen_api}: {e}")
+            return None, None
 
 async def download_thumbnail(thumb_url: str, output_path: str) -> bool:
     if not thumb_url:
