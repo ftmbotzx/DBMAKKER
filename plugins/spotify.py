@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 import logging
 import os
 from utils import safe_filename, download_with_aria2c, get_song_download_url_by_spotify_url, download_thumbnail
+import random 
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("pyrogram").setLevel(logging.ERROR)
@@ -265,8 +266,9 @@ async def handle_trackid_click(client, callback_query):
         await wait_msg.edit("❌ Song not found via API.")
         return
 
-    safe_name = safe_filename(song_title) + ".mp3"
-    download_path = os.path.join(output_dir, safe_name)
+    base_name = safe_filename(song_title)
+    unique_number = random.randint(100, 999)
+    safe_name = f"{base_name}_{unique_number}.mp3"
 
     await wait_msg.edit(f"⬇️ Downloading **{song_title}**...")
 
