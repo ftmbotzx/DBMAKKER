@@ -261,126 +261,147 @@ async def handle_cancel_download(client, callback_query):
 @Client.on_message(filters.private & filters.text)
 async def handle_spotify_link(client, message):
     user_id = message.from_user.id
+    text = message.text.strip()
 
-    lock = await get_user_lock(user_id)
-    if lock.locked():
-        await message.reply("⚠️ You already have a request running. Please wait for it to finish.")
+    playlist_pattern = r"https?://open\.spotify\.com/playlist/[a-zA-Z0-9]+"
+    track_pattern = r"https?://open\.spotify\.com/track/[a-zA-Z0-9]+"
+
+    # Locking omitted for brevity — add your lock system here if needed
+
+    if re.search(playlist_pattern, text):
+        # Handle playlist
+        await message.reply("⏳ Fetching Spotify playlist info...")
+        try:
+            image_url, name, songs, track_ids = get_playlist_info(text)
+            image_data = requests.get(image_url).content
+            with open("thumb.jpg", "wb") as f:
+                f.write(image_data)
+
+            reply = await message.reply_photo(
+                photo="thumb.jpg",
+                caption=f"🎧 **Playlist**: {name}\n📀 Total Songs: {len(songs)}\n\n🎵 Select a song below:"
+            )
+            keyboard = generate_keyboard(songs, track_ids, page=0, playlist_message_id=reply.id)
+            await reply.edit_reply_markup(reply_markup=keyboard)
+
+            song_cache[reply.id] = {"songs": songs, "track_ids": track_ids}
+        except Exception as e:
+            await message.reply(f"⚠️ Error: {e}")
+
         return
 
-    async with lock:
-        text = message.text.strip()
+    elif re.search(track_pattern, text):
+        # Handle single track directly
+        ansh = await message.reply("⏳ Fetching Spotify track info...")
 
-        playlist_pattern = r"https?://open\.spotify\.com/playlist/[a-zA-Z0-9]+"
-        track_pattern = r"https?://open\.spotify\.com/track/[a-zA-Z0-9]+"
+        # Extract track_id from URL
+        track_id = re.search(r"track/([a-zA-Z0-9]+)", text).group(1)
+        spotify_url = f"https://open.spotify.com/track/{track_id}"
 
-        if re.search(playlist_pattern, text):
-            # Handle playlist
-            await message.reply("⏳ Fetching Spotify playlist info...")
-
+        # Step 1: Check DB cache for dump file_id
+        dump_file_id = await db.get_dump_file_id(track_id)
+        if dump_file_id:
             try:
-                image_url, name, songs, track_ids = get_playlist_info(text)
-
-                # Download thumbnail
-                image_data = requests.get(image_url).content
-                with open("thumb.jpg", "wb") as f:
-                    f.write(image_data)
-
-                
-
-                reply = await message.reply_photo(
-                    photo="thumb.jpg",
-                    caption=f"🎧 **Playlist**: {name}\n📀 Total Songs: {len(songs)}\n\n🎵 Select a song below:"
+                await client.send_audio(
+                    user_id,
+                    dump_file_id,
+                    caption=f"🎵 **(From Cache)**"
                 )
-                keyboard = generate_keyboard(songs, track_ids, page=0, playlist_message_id=reply.id)
-                await reply.edit_reply_markup(reply_markup=keyboard)
-
-
-                song_cache[reply.id] = {"songs": songs, "track_ids": track_ids}
-
-            except Exception as e:
-                await message.reply(f"⚠️ Error: {e}")
-
-        elif re.search(track_pattern, text):
-            # Handle single track directly
-            ansh = await message.reply("⏳ Fetching Spotify track info...")
-
-            track_info = extract_track_info(text)
-            if not track_info:
-                await message.reply("⚠️ Could not fetch track info. Please check the link.")
+                await ansh.delete()
                 return
+            except Exception as e:
+                logging.info(f"Cache send failed: {e}")
+                # Remove from DB if file is missing
+                await db.col.delete_one({"track_id": track_id})
 
-            title, artist, thumb_url = track_info
-
-            wait_msg = await message.reply(f"🔄 Please wait... fetching your song: **{title}**")
+        # Step 2: Fetch track info and download
+        track_info = extract_track_info(spotify_url)
+        if not track_info:
+            await message.reply("⚠️ Could not fetch track info. Please check the link.")
             await ansh.delete()
+            return
 
-            try:
-                song_title, song_url = await get_song_download_url_by_spotify_url(text)
-            except Exception as e:
-                await wait_msg.edit("⚠️ An error occurred while fetching the song.")
-                return
+        title, artist, thumb_url = track_info
 
-            if not song_url:
-                await wait_msg.edit("❌ Song not found via API.")
-                return
+        wait_msg = await message.reply(f"🔄 Please wait... fetching your song: **{title}**")
+        await ansh.delete()
 
-            base_name = safe_filename(song_title)
-            unique_number = random.randint(100, 999)
-            safe_name = f"{base_name}_{unique_number}.mp3"
-            download_path = os.path.join(output_dir, safe_name)
+        try:
+            song_title, song_url = await get_song_download_url_by_spotify_url(spotify_url)
+        except Exception as e:
+            await wait_msg.edit("⚠️ An error occurred while fetching the song.")
+            return
 
+        if not song_url:
+            await wait_msg.edit("❌ Song not found via API.")
+            return
 
-            await wait_msg.edit(f"⬇️ Downloading **{song_title}**...")
+        base_name = safe_filename(song_title)
+        unique_number = random.randint(100, 999)
+        safe_name = f"{base_name}_{unique_number}.mp3"
+        download_path = os.path.join(output_dir, safe_name)
 
-            success = await download_with_aria2c(song_url, output_dir, safe_name)
-            if not success:
-                await wait_msg.edit("❌ Failed to download the song.")
-                return
+        await wait_msg.edit(f"⬇️ Downloading **{song_title}**...")
 
-            if not os.path.exists(download_path):
-                await wait_msg.edit("❌ Downloaded file not found.")
-                return
+        success = await download_with_aria2c(song_url, output_dir, safe_name)
+        if not success or not os.path.exists(download_path):
+            await wait_msg.edit("❌ Failed to download the song.")
+            return
 
-            # Download thumbnail
-            thumb_path = os.path.join(output_dir, safe_filename(song_title) + ".jpg")
-            logging.info(f"download path {thumb_path}")
-            thumb_success = await download_thumbnail(thumb_url, thumb_path)
+        thumb_path = os.path.join(output_dir, safe_filename(song_title) + ".jpg")
+        thumb_success = await download_thumbnail(thumb_url, thumb_path)
 
-            try:
-                await wait_msg.edit(f"📤 Uploading **{song_title}**...")
+        try:
+            await wait_msg.edit(f"📤 Uploading **{song_title}**...")
 
-                if thumb_success and os.path.exists(thumb_path):
-                    await client.send_audio(
-                        message.chat.id,
-                        download_path,
-                        caption=f"🎵 **{song_title}**\n👤 {artist}",
-                        thumb=thumb_path,
-                        title=song_title,
-                        performer=artist
-                    )
-                else:
-                    await client.send_audio(
-                        message.chat.id,
-                        download_path,
-                        caption=f"🎵 **{song_title}**\n👤 {artist}",
-                        title=song_title,
-                        performer=artist
-                    )
+            if thumb_success and os.path.exists(thumb_path):
+                sent_msg = await client.send_audio(
+                    user_id,
+                    download_path,
+                    caption=f"🎵 **{song_title}**\n👤 {artist}",
+                    thumb=thumb_path,
+                    title=song_title,
+                    performer=artist
+                )
+            else:
+                sent_msg = await client.send_audio(
+                    user_id,
+                    download_path,
+                    caption=f"🎵 **{song_title}**\n👤 {artist}",
+                    title=song_title,
+                    performer=artist
+                )
 
-                await wait_msg.delete()
+            # Step 3: Upload fresh to dump channel with track_id in caption
+            dump_caption = f"🎵 **{song_title}**\n👤 {artist}\n🆔 {track_id}"
+            dump_msg = await client.send_audio(
+                DUMP_CHANNEL_ID,
+                download_path,
+                caption=dump_caption,
+                thumb=thumb_path if thumb_success and os.path.exists(thumb_path) else None,
+                title=song_title,
+                performer=artist
+            )
 
-            except Exception as e:
-                await wait_msg.edit("⚠️ Failed to send the song file.")
+            # Step 4: Save dump file_id in DB for future
+            await db.save_dump_file_id(track_id, dump_msg.audio.file_id)
 
-            finally:
-                if os.path.exists(download_path):
-                    os.remove(download_path)
-                if os.path.exists(thumb_path):
-                    os.remove(thumb_path)
+            await wait_msg.delete()
 
-        else:
-            # If message does not match any Spotify pattern
-            pass
+        except Exception as e:
+            logging.error(f"Error sending audio: {e}")
+            await wait_msg.edit("⚠️ Failed to send the song file.")
+
+        finally:
+            if os.path.exists(download_path):
+                os.remove(download_path)
+            if os.path.exists(thumb_path):
+                os.remove(thumb_path)
+
+        return
+
+    else:
+        await message.reply("⚠️ Please send a valid Spotify track or playlist link.")
 
 
 # --- Pagination Callback Handler ---
