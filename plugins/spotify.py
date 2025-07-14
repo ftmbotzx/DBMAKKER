@@ -155,6 +155,53 @@ import aiohttp
 
 import aiohttp
 
+import logging
+import subprocess
+import os
+import asyncio
+import re
+
+
+def safe_filename(name: str) -> str:
+    # Remove unsafe filename chars
+    return re.sub(r'[\\/*?:"<>|]', '_', name)
+
+async def download_with_aria2c(url: str, output_path: str) -> bool:
+    """
+    Download file using aria2c CLI asynchronously.
+    Returns True if download succeeded, else False.
+    """
+    # Example aria2c command:
+    # aria2c -x 16 -s 16 -k 1M -o filename.mp3 url
+    # -x: max connections per server
+    # -s: number of connections
+    # -k: min split size
+
+    cmd = [
+        "aria2c",
+        "-x", "16",
+        "-s", "16",
+        "-k", "1M",
+        "-o", output_path,
+        url
+    ]
+    logger.info(f"Starting aria2c download: {' '.join(cmd)}")
+
+    # Run subprocess asynchronously
+    process = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await process.communicate()
+
+    if process.returncode == 0:
+        logger.info(f"aria2c download succeeded: {output_path}")
+        return True
+    else:
+        logger.error(f"aria2c download failed: {stderr.decode().strip()}")
+        return False
+
 @Client.on_callback_query(filters.regex("trackid:"))
 async def handle_trackid_click(client, callback_query):
     track_id = callback_query.data.split(":")[1]
@@ -181,9 +228,32 @@ async def handle_trackid_click(client, callback_query):
         return
 
     logger.info(f"Found song '{song_title}' with download URL: {song_url}")
-    await wait_msg.edit(f"✅ Found: **{song_title}**\n🔗 [Listen/Download]({song_url})", disable_web_page_preview=False)
 
+    # Prepare filename & output path for download
+    safe_name = safe_filename(song_title) + ".mp3"
+    download_path = f"/tmp/{safe_name}"
 
+    await wait_msg.edit(f"⬇️ Downloading **{song_title}**...")
+
+    success = await download_with_aria2c(song_url, download_path)
+
+    if not success:
+        await wait_msg.edit("❌ Failed to download the song.")
+        return
+
+    # Send the downloaded file to the user
+    try:
+        await wait_msg.edit(f"📤 Uploading **{song_title}**...")
+        await client.send_audio(user_id, download_path, caption=song_title)
+        await wait_msg.delete()
+    except Exception as e:
+        logger.error(f"Error sending song file: {e}")
+        await wait_msg.edit("⚠️ Failed to send the song file.")
+    finally:
+        # Clean up downloaded file
+        if os.path.exists(download_path):
+            os.remove(download_path)
+            logger.info(f"Deleted temporary file: {download_path}")
 
 
 async def get_song_download_url_by_spotify_url(spotify_url: str):
