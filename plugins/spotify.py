@@ -426,6 +426,7 @@ async def handle_trackid_click(client, callback_query):
 
         await callback_query.answer("🎵 Fetching your song...")
 
+        # ✅ Check in dump channel by search
         results = await client.search_messages(
             chat_id=DUMP_CHANNEL_ID,
             query=track_id,
@@ -496,12 +497,16 @@ async def handle_trackid_click(client, callback_query):
                     performer=artist
                 )
 
-            caption = f"🎵 **{song_title}**\n👤 {artist}\n🆔 {track_id}"
-            dump_forward = await client.forward_messages(
-                chat_id=DUMP_CHANNEL_ID,
-                from_chat_id=user_id,
-                caption=caption,
-                message_ids=sent_msg.id
+            # ✅ dump channel mein fresh send with track_id
+            dump_caption = f"🎵 **{song_title}**\n👤 {artist}\n🆔 {track_id}"
+
+            await client.send_audio(
+                DUMP_CHANNEL_ID,
+                download_path,
+                caption=dump_caption,
+                thumb=thumb_path if thumb_success and os.path.exists(thumb_path) else None,
+                title=song_title,
+                performer=artist
             )
 
             await wait_msg.delete()
