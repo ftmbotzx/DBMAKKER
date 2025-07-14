@@ -152,70 +152,41 @@ import aiohttp
 
 import aiohttp
 
-async def get_song_download_url(song_title, artist_name):
-    query = song_title
+@Client.on_callback_query(filters.regex("trackid:"))
+async def handle_trackid_click(client, callback_query):
+    track_id = callback_query.data.split(":")[1]
+    user_id = callback_query.from_user.id
 
-    api_url = f"https://saavnapi-nine.vercel.app/song/?query={query}"
+    await callback_query.answer("🎵 Fetching your song...")
+    wait_msg = await client.send_message(user_id, "🔄 Please wait... fetching your song.")
+
+    spotify_url = f"https://open.spotify.com/track/{track_id}"
+
+    # Pass full spotify url to the new API wrapper function
+    song_title, song_url = await get_song_download_url_by_spotify_url(spotify_url)
+
+    if not song_url:
+        await wait_msg.edit("❌ Song not found via API.")
+        return
+
+    await wait_msg.edit(f"✅ Found: **{song_title}**\n🔗 [Listen/Download]({song_url})", disable_web_page_preview=False)
+
+
+async def get_song_download_url_by_spotify_url(spotify_url: str):
+    import urllib.parse
+    encoded_url = urllib.parse.quote(spotify_url)
+    api_url = f"https://tet-kpy4.onrender.com/spotify?url={encoded_url}"
 
     async with aiohttp.ClientSession() as session:
         async with session.get(api_url) as resp:
             if resp.status == 200:
                 data = await resp.json()
-
-                if isinstance(data, list) and data:
-                    # Match try karo har item se
-                    for item in data:
-                        song_name = item.get("song", "").lower()
-                        primary_artists = item.get("primary_artists", "").lower()
-
-                        # Song aur artist match check
-                        if song_title.lower() in song_name and artist_name.lower() in primary_artists:
-                            return item.get("song"), item.get("media_url")
-
-                    # Agar exact match nahi toh pehla result fallback
-                    first = data[0]
-                    return first.get("song"), first.get("media_url")
+                if data.get("status") and "data" in data:
+                    song_data = data["data"]
+                    found_title = song_data.get("title")
+                    download_url = song_data.get("download")
+                    return found_title, download_url
                 else:
                     return None, None
             else:
                 return None, None
-
-
-
-@Client.on_callback_query(filters.regex("trackid:"))
-async def handle_trackid_click(client, callback_query):
-    track_id = callback_query.data.split(":")[1]
-    user_id = callback_query.from_user.id
-    msg_id = callback_query.message.id
-
-    data = song_cache.get(msg_id, {})
-    songs = data.get("songs", [])
-    track_ids = data.get("track_ids", [])
-
-    try:
-        index = track_ids.index(track_id)
-        song_name = songs[index]
-    except:
-        song_name = "Selected Song"
-
-    await callback_query.answer(f"🎵 Sending {song_name}")
-    wait_msg = await client.send_message(user_id, "🔄 Please wait... fetching your song.")
-
-    # Spotify API se original title & artist nikaalo
-    spotify_url = f"https://open.spotify.com/track/{track_id}"
-    title_artist = extract_track_info(spotify_url)
-
-    if not title_artist:
-        await wait_msg.edit("⚠️ Failed to extract song details from Spotify.")
-        return
-
-    title, artist = title_artist
-    song_title, song_url = await get_song_download_url(title, artist)
-
-    if not song_url:
-        await wait_msg.edit("❌ Song not found on JioSaavn.")
-        return
-
-    # Send download link (or you can download and upload file)
-    await wait_msg.edit(f"✅ Found: **{song_title}**\n🔗 [Listen/Download]({song_url})", disable_web_page_preview=False)
-
