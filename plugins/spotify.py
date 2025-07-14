@@ -184,6 +184,8 @@ async def handle_trackid_click(client, callback_query):
     await wait_msg.edit(f"✅ Found: **{song_title}**\n🔗 [Listen/Download]({song_url})", disable_web_page_preview=False)
 
 
+
+
 async def get_song_download_url_by_spotify_url(spotify_url: str):
     encoded_url = urllib.parse.quote(spotify_url)
     api_url = f"https://tet-kpy4.onrender.com/spotify?url={encoded_url}"
@@ -202,8 +204,15 @@ async def get_song_download_url_by_spotify_url(spotify_url: str):
                     found_title = song_data.get("title")
                     download_url = song_data.get("download")
 
-                    logger.info(f"API returned song title: {found_title}")
-                    return found_title, download_url
+                    if download_url:
+                        # Encode download URL so spaces and special chars don't break links
+                        download_url_fixed = urllib.parse.quote(download_url, safe=':/?&=')
+                        logger.info(f"API returned song title: {found_title}")
+                        logger.info(f"Fixed download URL: {download_url_fixed}")
+                        return found_title, download_url_fixed
+                    else:
+                        logger.warning("Download URL missing in API response data.")
+                        return found_title, None
                 else:
                     logger.warning(f"API response missing expected data or status is false: {data}")
                     return None, None
