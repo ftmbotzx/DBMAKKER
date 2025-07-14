@@ -411,6 +411,7 @@ async def handle_noop(client, callback_query):
 
 
 
+
 @Client.on_callback_query(filters.regex("trackid:"))
 async def handle_trackid_click(client, callback_query):
     user_id = callback_query.from_user.id
@@ -426,7 +427,7 @@ async def handle_trackid_click(client, callback_query):
 
         await callback_query.answer("🎵 Fetching your song...")
 
-        # ✅ Step 1: Check in dump cache
+        # ✅ Check dump channel first
         if track_id in dump_channel_cache:
             dump_msg_id = dump_channel_cache[track_id]
             try:
@@ -435,12 +436,11 @@ async def handle_trackid_click(client, callback_query):
                     from_chat_id=DUMP_CHANNEL_ID,
                     message_ids=dump_msg_id
                 )
-                return  # done!
+                return
             except Exception:
-                # maybe deleted from dump, remove cache & proceed to download
                 dump_channel_cache.pop(track_id)
 
-        # Step 2: Fetch song info
+        # Download if not found
         track_info = extract_track_info(spotify_url)
         if not track_info:
             await client.send_message(user_id, "⚠️ Failed to fetch track info.")
@@ -452,35 +452,31 @@ async def handle_trackid_click(client, callback_query):
 
         try:
             song_title, song_url = await get_song_download_url_by_spotify_url(spotify_url)
-        except Exception as e:
-            await wait_msg.edit("⚠️ An error occurred while fetching the song.")
+        except Exception:
+            await wait_msg.edit("⚠️ Error fetching the song.")
             return
 
         if not song_url:
-            await wait_msg.edit("❌ Song not found via API.")
+            await wait_msg.edit("❌ Song not found.")
             return
 
         base_name = safe_filename(song_title)
-        unique_number = random.randint(100, 999)
-        safe_name = f"{base_name}_{unique_number}.mp3"
+        safe_name = f"{base_name}_{random.randint(100, 999)}.mp3"
         download_path = os.path.join(output_dir, safe_name)
 
         await wait_msg.edit(f"⬇️ Downloading **{song_title}**...")
 
         success = await download_with_aria2c(song_url, output_dir, safe_name)
         if not success or not os.path.exists(download_path):
-            await wait_msg.edit("❌ Failed to download the song.")
+            await wait_msg.edit("❌ Download failed.")
             return
 
-        # Download thumbnail
         thumb_path = os.path.join(output_dir, safe_filename(song_title) + ".jpg")
-        logging.info(f"download path {thumb_path}")
         thumb_success = await download_thumbnail(thumb_url, thumb_path)
 
         try:
             await wait_msg.edit(f"📤 Uploading **{song_title}**...")
 
-            # Send audio to user
             if thumb_success and os.path.exists(thumb_path):
                 sent_msg = await client.send_audio(
                     user_id,
@@ -499,22 +495,20 @@ async def handle_trackid_click(client, callback_query):
                     performer=artist
                 )
 
-            # ✅ Step 3: send same audio to dump channel & save message id
-            dump_msg = await client.send_audio(
-                DUMP_CHANNEL_ID,
-                download_path,
-                caption=f"🎵 **{song_title}**\n👤 {artist}",
-                thumb=thumb_path if thumb_success and os.path.exists(thumb_path) else None,
-                title=song_title,
-                performer=artist
+            # ✅ Forward that same user message to dump channel
+            dump_forward = await client.forward_messages(
+                chat_id=DUMP_CHANNEL_ID,
+                from_chat_id=user_id,
+                message_ids=sent_msg.id
             )
-            dump_channel_cache[track_id] = dump_msg.message_id
+
+            dump_channel_cache[track_id] = dump_forward.id
 
             await wait_msg.delete()
 
         except Exception as e:
             logging.error(f"Error sending audio: {e}")
-            await wait_msg.edit("⚠️ Failed to send the song file.")
+            await wait_msg.edit("⚠️ Failed to send audio.")
 
         finally:
             if os.path.exists(download_path):
