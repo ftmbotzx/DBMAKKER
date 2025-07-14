@@ -158,8 +158,11 @@ async def handle_spotify_link(client, message):
             await wait_msg.edit("❌ Song not found via API.")
             return
 
-        safe_name = safe_filename(song_title) + ".mp3"
+        base_name = safe_filename(song_title)
+        unique_number = random.randint(100, 999)
+        safe_name = f"{base_name}_{unique_number}.mp3"
         download_path = os.path.join(output_dir, safe_name)
+
 
         await wait_msg.edit(f"⬇️ Downloading **{song_title}**...")
 
@@ -269,6 +272,8 @@ async def handle_trackid_click(client, callback_query):
     base_name = safe_filename(song_title)
     unique_number = random.randint(100, 999)
     safe_name = f"{base_name}_{unique_number}.mp3"
+    download_path = os.path.join(output_dir, safe_name)
+
 
     await wait_msg.edit(f"⬇️ Downloading **{song_title}**...")
 
