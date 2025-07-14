@@ -435,12 +435,12 @@ async def handle_trackid_click(client, callback_query):
         await callback_query.answer("🎵 Fetching your song...")
 
         # --- Step 1: Check DB cache for dump_msg_id ---
-        dump_msg_id = await db.get_dump_msg_id(track_id)
+        dump_file_id = await db.get_dump_msg_id(track_id)
         if dump_msg_id:
             try:
                 await client.forward_messages(
                     chat_id=user_id,
-                    from_chat_id=DUMP_CHANNEL_ID,
+                    audio=dump_file_id,
                     caption=f"🎵 **{title}**\n👤 {artist}",
                     message_ids=dump_msg_id
                 )
@@ -521,7 +521,7 @@ async def handle_trackid_click(client, callback_query):
             )
 
             # --- Save to DB ---
-            await db.save_dump_msg_id(track_id, dump_msg.id)
+            await db.save_dump_file_id(track_id, dump_msg.audio.file_id)
 
             await wait_msg.delete()
 
