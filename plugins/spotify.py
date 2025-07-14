@@ -129,6 +129,33 @@ def generate_keyboard(song_list, track_ids, page=0, per_page=8, playlist_message
 
     return InlineKeyboardMarkup(buttons)
 
+
+# --- Pagination Callback Handler ---
+
+@Client.on_callback_query(filters.regex("page:"))
+async def paginate_callback(client, callback_query):
+    page = int(callback_query.data.split(":")[1])
+    message_id = callback_query.message.id
+
+    data = song_cache.get(message_id)
+    if not data:
+        await callback_query.answer("❌ Song list expired.", show_alert=True)
+        return
+
+    songs = data["songs"]
+    track_ids = data["track_ids"]
+    playlist_message_id = data.get("playlist_message_id")  # ✅ Yeh line zaroori hai!
+
+    keyboard = generate_keyboard(
+        songs,
+        track_ids,
+        page=page,
+        per_page=8,
+        playlist_message_id=playlist_message_id   # ✅ Ab hamesha jayega!
+    )
+
+    await callback_query.edit_message_reply_markup(reply_markup=keyboard)
+
 import asyncio
 
 download_all_tasks = {}
@@ -444,23 +471,6 @@ async def handle_spotify_link(client, message):
     else:
         await message.reply("⚠️ Please send a valid Spotify track or playlist link.")
 
-
-# --- Pagination Callback Handler ---
-
-@Client.on_callback_query(filters.regex("page:"))
-async def paginate_callback(client, callback_query):
-    page = int(callback_query.data.split(":")[1])
-    message_id = callback_query.message.id
-
-    data = song_cache.get(message_id)
-    if not data:
-        await callback_query.answer("❌ Song list expired.", show_alert=True)
-        return
-
-    songs = data["songs"]
-    track_ids = data["track_ids"]
-    keyboard = generate_keyboard(songs, track_ids, page=page, playlist_message_id=playlist_message_id)
-    await callback_query.edit_message_reply_markup(reply_markup=keyboard)
 
 
 # --- Dummy Button Handler ---
