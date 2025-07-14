@@ -8,6 +8,8 @@ import math
 from urllib.parse import urlparse
 from info import USERBOT_CHAT_ID
 import logging
+import urllib.parse
+
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("pyrogram").setLevel(logging.ERROR)
