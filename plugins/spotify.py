@@ -130,6 +130,11 @@ def generate_keyboard(song_list, track_ids, page=0, per_page=8, playlist_message
     return InlineKeyboardMarkup(buttons)
 
 
+import asyncio
+
+download_all_tasks = {}
+download_all_cancel_flags = {}
+
 @Client.on_callback_query(filters.regex(r"downloadall:(\d+)"))
 async def handle_download_all(client, callback_query):
     message_id = int(callback_query.data.split(":")[1])
@@ -143,25 +148,40 @@ async def handle_download_all(client, callback_query):
     songs = data["songs"]
     track_ids = data["track_ids"]
 
-    # Check if already running a download all for this user+message
     key = (user_id, message_id)
     if key in download_all_tasks:
         await callback_query.answer("⚠️ Download all already in progress.", show_alert=True)
         return
 
-    # Set cancel flag to False initially
     download_all_cancel_flags[key] = False
 
     async def download_all_songs():
         sent_count = 0
         total = len(track_ids)
-
         status_msg = await client.send_message(user_id, f"⬇️ Starting download of {total} songs...")
 
         for i, track_id in enumerate(track_ids, start=1):
             if download_all_cancel_flags.get(key):
                 await status_msg.edit(f"❌ Download cancelled by user after sending {sent_count} songs.")
                 break
+
+            # Step 1: Check dump DB cache for existing file_id
+            dump_file_id = await db.get_dump_file_id(track_id)
+            if dump_file_id:
+                try:
+                    await client.send_audio(
+                        user_id,
+                        dump_file_id,
+                        caption=f"🎵 (From Cache) Song {i} of {total}"
+                    )
+                    sent_count += 1
+                    await status_msg.edit(f"⬇️ Sending cached song {i} of {total}\n"
+                                          f"✅ Sent: {sent_count}\n"
+                                          f"⏳ Remaining: {total - sent_count}")
+                    continue  # next song
+                except Exception as e:
+                    logging.info(f"Failed to send cached song {track_id}: {e}")
+                    await db.col.delete_one({"track_id": track_id})  # remove broken cache
 
             spotify_url = f"https://open.spotify.com/track/{track_id}"
             track_info = extract_track_info(spotify_url)
@@ -172,8 +192,8 @@ async def handle_download_all(client, callback_query):
             title, artist, thumb_url = track_info
 
             await status_msg.edit(f"⬇️ Downloading song {i} of {total}: **{title}**\n"
-                                  f"✅ Sent: {sent_count} songs\n"
-                                  f"⏳ Remaining: {total - sent_count} songs")
+                                  f"✅ Sent: {sent_count}\n"
+                                  f"⏳ Remaining: {total - sent_count}")
 
             try:
                 song_title, song_url = await get_song_download_url_by_spotify_url(spotify_url)
@@ -199,7 +219,7 @@ async def handle_download_all(client, callback_query):
 
             try:
                 if thumb_success and os.path.exists(thumb_path):
-                    await client.send_audio(
+                    sent_msg = await client.send_audio(
                         user_id,
                         download_path,
                         caption=f"🎵 **{song_title}**\n👤 {artist}",
@@ -208,15 +228,35 @@ async def handle_download_all(client, callback_query):
                         performer=artist
                     )
                 else:
-                    await client.send_audio(
+                    sent_msg = await client.send_audio(
                         user_id,
                         download_path,
                         caption=f"🎵 **{song_title}**\n👤 {artist}",
                         title=song_title,
                         performer=artist
                     )
+
+                # Upload to dump channel fresh with track_id in caption
+                dump_caption = f"🎵 **{song_title}**\n👤 {artist}\n🆔 {track_id}"
+                dump_msg = await client.send_audio(
+                    DUMP_CHANNEL_ID,
+                    audio=sent_msg.audio.file_id,
+                    caption=dump_caption,
+                    thumb=thumb_path if thumb_success and os.path.exists(thumb_path) else None,
+                    title=song_title,
+                    performer=artist
+                )
+
+                # Save dump file_id in DB
+                await db.save_dump_file_id(track_id, dump_msg.audio.file_id)
+
                 sent_count += 1
-            except Exception:
+                await status_msg.edit(f"⬇️ Downloading song {i} of {total}: **{song_title}**\n"
+                                      f"✅ Sent: {sent_count}\n"
+                                      f"⏳ Remaining: {total - sent_count}")
+
+            except Exception as e:
+                logging.error(f"Error sending song {song_title}: {e}")
                 await client.send_message(user_id, f"⚠️ Failed to send: {song_title}. Skipping...")
 
             finally:
@@ -233,7 +273,6 @@ async def handle_download_all(client, callback_query):
         download_all_tasks.pop(key, None)
         download_all_cancel_flags.pop(key, None)
 
-    # Launch the task and save it
     task = asyncio.create_task(download_all_songs())
     download_all_tasks[key] = task
 
