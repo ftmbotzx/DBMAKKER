@@ -439,7 +439,7 @@ async def handle_trackid_click(client, callback_query):
         if dump_file_id:
             try:
                 await client.forward_messages(
-                    chat_id=user_id,
+                    user_id,
                     dump_file_id,
                     caption=f"🎵 **{title}**\n👤 {artist}"
                 )
