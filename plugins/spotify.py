@@ -474,11 +474,6 @@ async def handle_spotify_link(client, message):
 
 
 
-# --- Dummy Button Handler ---
-
-@Client.on_callback_query(filters.regex("noop"))
-async def handle_noop(client, callback_query):
-    await callback_query.answer("🎵 Downloading soon...", show_alert=False)
 
 
 
