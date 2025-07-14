@@ -26,6 +26,7 @@ song_cache = {}
 
 
 output_dir = "/downloads"
+os.makedirs(output_dir, exist_ok=True)
 
 
 
