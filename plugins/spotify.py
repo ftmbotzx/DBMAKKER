@@ -8,7 +8,7 @@ import math
 from urllib.parse import urlparse
 import logging
 import os
-from utils import safe_filename, download_with_aria2c, get_song_download_url_by_spotify_url, download_thumbnail
+from utils import safe_filename, download_with_aria2c, get_song_download_url_by_spotify_url, download_thumbnail, handle_request
 import random 
 
 logging.basicConfig(level=logging.INFO)
@@ -166,7 +166,7 @@ async def handle_spotify_link(client, message):
 
         await wait_msg.edit(f"⬇️ Downloading **{song_title}**...")
 
-        success = await download_with_aria2c(song_url, output_dir, safe_name)
+        success = await handle_request(song_url, output_dir, safe_name)
         if not success:
             await wait_msg.edit("❌ Failed to download the song.")
             return
@@ -277,7 +277,7 @@ async def handle_trackid_click(client, callback_query):
 
     await wait_msg.edit(f"⬇️ Downloading **{song_title}**...")
 
-    success = await download_with_aria2c(song_url, output_dir, safe_name)
+    success = await handle_request(song_url, output_dir, safe_name)
     if not success:
         await wait_msg.edit("❌ Failed to download the song.")
         return
