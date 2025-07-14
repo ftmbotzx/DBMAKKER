@@ -441,8 +441,7 @@ async def handle_trackid_click(client, callback_query):
                 await client.forward_messages(
                     user_id,
                     dump_file_id,
-                    caption=f"🎵 **{title}**\n👤 {artist}"
-                )
+                    caption=f"🎵 **{title}**\n👤 {artist}")
                 return
             except Exception as e:
                 # Forward failed (message deleted?), remove cache and continue
