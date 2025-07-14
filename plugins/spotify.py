@@ -154,40 +154,36 @@ import aiohttp
 
 
 import aiohttp
-
 import logging
 import subprocess
 import os
 import asyncio
 import re
+import urllib.parse
+from pyrogram import Client, filters  # make sure you import your pyrogram Client and filters
 
+logger = logging.getLogger(__name__)
 
 def safe_filename(name: str) -> str:
-    # Remove unsafe filename chars
+    # Remove unsafe filename chars from song title for filesystem
     return re.sub(r'[\\/*?:"<>|]', '_', name)
 
-async def download_with_aria2c(url: str, output_path: str) -> bool:
+async def download_with_aria2c(url: str, output_dir: str, filename: str) -> bool:
     """
     Download file using aria2c CLI asynchronously.
     Returns True if download succeeded, else False.
     """
-    # Example aria2c command:
-    # aria2c -x 16 -s 16 -k 1M -o filename.mp3 url
-    # -x: max connections per server
-    # -s: number of connections
-    # -k: min split size
-
     cmd = [
         "aria2c",
         "-x", "16",
         "-s", "16",
         "-k", "1M",
-        "-o", output_path,
+        "-d", output_dir,   # Directory to save the file
+        "-o", filename,     # Filename only
         url
     ]
     logger.info(f"Starting aria2c download: {' '.join(cmd)}")
 
-    # Run subprocess asynchronously
     process = await asyncio.create_subprocess_exec(
         *cmd,
         stdout=asyncio.subprocess.PIPE,
@@ -196,7 +192,8 @@ async def download_with_aria2c(url: str, output_path: str) -> bool:
     stdout, stderr = await process.communicate()
 
     if process.returncode == 0:
-        logger.info(f"aria2c download succeeded: {output_path}")
+        full_path = os.path.join(output_dir, filename)
+        logger.info(f"aria2c download succeeded: {full_path}")
         return True
     else:
         logger.error(f"aria2c download failed: {stderr.decode().strip()}")
@@ -229,19 +226,23 @@ async def handle_trackid_click(client, callback_query):
 
     logger.info(f"Found song '{song_title}' with download URL: {song_url}")
 
-    # Prepare filename & output path for download
     safe_name = safe_filename(song_title) + ".mp3"
-    download_path = f"/tmp/{safe_name}"
+    output_dir = "/tmp"
+    download_path = os.path.join(output_dir, safe_name)
 
     await wait_msg.edit(f"⬇️ Downloading **{song_title}**...")
 
-    success = await download_with_aria2c(song_url, download_path)
+    success = await download_with_aria2c(song_url, output_dir, safe_name)
 
     if not success:
         await wait_msg.edit("❌ Failed to download the song.")
         return
 
-    # Send the downloaded file to the user
+    if not os.path.exists(download_path):
+        logger.error(f"File not found after aria2c download: {download_path}")
+        await wait_msg.edit("❌ Downloaded file not found.")
+        return
+
     try:
         await wait_msg.edit(f"📤 Uploading **{song_title}**...")
         await client.send_audio(user_id, download_path, caption=song_title)
@@ -250,11 +251,9 @@ async def handle_trackid_click(client, callback_query):
         logger.error(f"Error sending song file: {e}")
         await wait_msg.edit("⚠️ Failed to send the song file.")
     finally:
-        # Clean up downloaded file
         if os.path.exists(download_path):
             os.remove(download_path)
             logger.info(f"Deleted temporary file: {download_path}")
-
 
 async def get_song_download_url_by_spotify_url(spotify_url: str):
     encoded_url = urllib.parse.quote(spotify_url)
@@ -289,3 +288,4 @@ async def get_song_download_url_by_spotify_url(spotify_url: str):
             else:
                 logger.error(f"API request failed with status code: {resp.status}")
                 return None, None
+
