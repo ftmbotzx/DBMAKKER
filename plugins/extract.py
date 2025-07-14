@@ -95,6 +95,10 @@ async def artist_songs(client, message):
         total_albums = len(album_ids)
         total_singles = len(single_ids)
 
+        # ** Final total songs: just total unique songs with artist anywhere in artists list **
+        # (same as total_songs here since we already filtered)
+        final_total_songs = total_songs
+
         reply_text = (
             f"👤 **Artist:** {sp.artist(artist_id)['name']}\n\n"
             f"📊 **Summary:**\n"
@@ -104,7 +108,8 @@ async def artist_songs(client, message):
             f"• Total Songs (Singles): {total_single_tracks}\n"
             f"• Total Unique Songs (Albums + Singles): {total_songs}\n"
             f"• Original Songs (Primary Artist): {original_count}\n"
-            f"• Other Songs (Featuring/Remix/Collab): {non_original_count}\n"
+            f"• Other Songs (Featuring/Remix/Collab): {non_original_count}\n\n"
+            f"🎯 **Final Total Songs (All combined):** {final_total_songs}"
         )
 
         await message.reply(reply_text)
