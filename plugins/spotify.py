@@ -426,18 +426,20 @@ async def handle_trackid_click(client, callback_query):
 
         await callback_query.answer("🎵 Fetching your song...")
 
-        # ✅ Check dump channel first
-        if track_id in dump_channel_cache:
-            dump_msg_id = dump_channel_cache[track_id]
-            try:
-                await client.forward_messages(
-                    chat_id=user_id,
-                    from_chat_id=DUMP_CHANNEL_ID,
-                    message_ids=dump_msg_id
-                )
-                return
-            except Exception:
-                dump_channel_cache.pop(track_id)
+        results = await client.search_messages(
+            chat_id=DUMP_CHANNEL_ID,
+            query=track_id,
+            limit=1
+        )
+
+        if results:
+            dump_msg = results[0]
+            await client.forward_messages(
+                chat_id=user_id,
+                from_chat_id=DUMP_CHANNEL_ID,
+                message_ids=dump_msg.id
+            )
+            return
 
         # Download if not found
         track_info = extract_track_info(spotify_url)
@@ -494,14 +496,13 @@ async def handle_trackid_click(client, callback_query):
                     performer=artist
                 )
 
-            # ✅ Forward that same user message to dump channel
+            caption = f"🎵 **{song_title}**\n👤 {artist}\n🆔 {track_id}"
             dump_forward = await client.forward_messages(
                 chat_id=DUMP_CHANNEL_ID,
                 from_chat_id=user_id,
+                caption=caption,
                 message_ids=sent_msg.id
             )
-
-            dump_channel_cache[track_id] = dump_forward.id
 
             await wait_msg.delete()
 
