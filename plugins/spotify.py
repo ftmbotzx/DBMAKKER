@@ -82,7 +82,13 @@ def get_playlist_info(playlist_url):
     return image_url, playlist_name, song_list, track_ids
 
 
-def generate_keyboard(song_list, track_ids, page=0, per_page=8):
+import asyncio
+
+# Store ongoing download all tasks per user-message_id to support cancellation
+download_all_tasks = {}
+download_all_cancel_flags = {}
+
+def generate_keyboard(song_list, track_ids, page=0, per_page=8, playlist_message_id=None):
     start = page * per_page
     end = start + per_page
     buttons = []
@@ -109,7 +115,140 @@ def generate_keyboard(song_list, track_ids, page=0, per_page=8):
     if nav_buttons:
         buttons.append(nav_buttons)
 
+    # Add Download All and Cancel buttons if playlist_message_id provided
+    if playlist_message_id is not None:
+        buttons.append([
+            InlineKeyboardButton("⬇️ Download All", callback_data=f"downloadall:{playlist_message_id}"),
+            InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_download:{playlist_message_id}")
+        ])
+
     return InlineKeyboardMarkup(buttons)
+
+
+@Client.on_callback_query(filters.regex(r"downloadall:(\d+)"))
+async def handle_download_all(client, callback_query):
+    message_id = int(callback_query.data.split(":")[1])
+    user_id = callback_query.from_user.id
+
+    data = song_cache.get(message_id)
+    if not data:
+        await callback_query.answer("❌ Playlist data expired.", show_alert=True)
+        return
+
+    songs = data["songs"]
+    track_ids = data["track_ids"]
+
+    # Check if already running a download all for this user+message
+    key = (user_id, message_id)
+    if key in download_all_tasks:
+        await callback_query.answer("⚠️ Download all already in progress.", show_alert=True)
+        return
+
+    # Set cancel flag to False initially
+    download_all_cancel_flags[key] = False
+
+    async def download_all_songs():
+        sent_count = 0
+        total = len(track_ids)
+
+        status_msg = await client.send_message(user_id, f"⬇️ Starting download of {total} songs...")
+
+        for i, track_id in enumerate(track_ids, start=1):
+            if download_all_cancel_flags.get(key):
+                await status_msg.edit(f"❌ Download cancelled by user after sending {sent_count} songs.")
+                break
+
+            spotify_url = f"https://open.spotify.com/track/{track_id}"
+            track_info = extract_track_info(spotify_url)
+            if not track_info:
+                await client.send_message(user_id, f"⚠️ Failed to fetch info for song {i}. Skipping...")
+                continue
+
+            title, artist, thumb_url = track_info
+
+            await status_msg.edit(f"⬇️ Downloading song {i} of {total}: **{title}**\n"
+                                  f"✅ Sent: {sent_count} songs\n"
+                                  f"⏳ Remaining: {total - sent_count} songs")
+
+            try:
+                song_title, song_url = await get_song_download_url_by_spotify_url(spotify_url)
+            except Exception:
+                await client.send_message(user_id, f"⚠️ Error fetching song {i}. Skipping...")
+                continue
+
+            if not song_url:
+                await client.send_message(user_id, f"❌ Song not found: {title}. Skipping...")
+                continue
+
+            base_name = safe_filename(song_title)
+            safe_name = f"{base_name}_{random.randint(100, 999)}.mp3"
+            download_path = os.path.join(output_dir, safe_name)
+
+            success = await download_with_aria2c(song_url, output_dir, safe_name)
+            if not success or not os.path.exists(download_path):
+                await client.send_message(user_id, f"❌ Failed to download: {song_title}. Skipping...")
+                continue
+
+            thumb_path = os.path.join(output_dir, safe_filename(song_title) + ".jpg")
+            thumb_success = await download_thumbnail(thumb_url, thumb_path)
+
+            try:
+                if thumb_success and os.path.exists(thumb_path):
+                    await client.send_audio(
+                        user_id,
+                        download_path,
+                        caption=f"🎵 **{song_title}**\n👤 {artist}",
+                        thumb=thumb_path,
+                        title=song_title,
+                        performer=artist
+                    )
+                else:
+                    await client.send_audio(
+                        user_id,
+                        download_path,
+                        caption=f"🎵 **{song_title}**\n👤 {artist}",
+                        title=song_title,
+                        performer=artist
+                    )
+                sent_count += 1
+            except Exception:
+                await client.send_message(user_id, f"⚠️ Failed to send: {song_title}. Skipping...")
+
+            finally:
+                if os.path.exists(download_path):
+                    os.remove(download_path)
+                if os.path.exists(thumb_path):
+                    os.remove(thumb_path)
+
+        else:
+            if not download_all_cancel_flags.get(key):
+                await status_msg.edit(f"✅ All songs sent successfully! Total: {sent_count}")
+
+        # Cleanup
+        download_all_tasks.pop(key, None)
+        download_all_cancel_flags.pop(key, None)
+
+    # Launch the task and save it
+    task = asyncio.create_task(download_all_songs())
+    download_all_tasks[key] = task
+
+    await callback_query.answer("⬇️ Started downloading all songs. Check your PM.")
+
+
+@Client.on_callback_query(filters.regex(r"cancel_download:(\d+)"))
+async def handle_cancel_download(client, callback_query):
+    message_id = int(callback_query.data.split(":")[1])
+    user_id = callback_query.from_user.id
+
+    key = (user_id, message_id)
+    if key not in download_all_tasks:
+        await callback_query.answer("❌ No active download to cancel.", show_alert=True)
+        return
+
+    # Set cancel flag to True
+    download_all_cancel_flags[key] = True
+
+    await callback_query.answer("❌ Cancelling download...", show_alert=True)
 
 
 # --- Main Message Handler with concurrency lock ---
