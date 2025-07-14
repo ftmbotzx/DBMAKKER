@@ -15,20 +15,22 @@ def safe_filename(name: str) -> str:
 
 import asyncio
 
-# ek hi waqt mein max 2 downloads chalu honge
-aria2c_semaphore = asyncio.Semaphore(2)
+aria2c_semaphore = asyncio.Semaphore(1)  # max 1 parallel
 
 async def download_with_aria2c(url, output_dir, filename):
     async with aria2c_semaphore:
+        # optional small delay before starting
+        await asyncio.sleep(1)
+
         cmd = [
             "aria2c",
-            "-x", "4",
-            "-s", "4",
+            "-x", "2",
+            "-s", "2",
             "-k", "1M",
             "--max-tries=5",
             "--retry-wait=5",
             "--timeout=60",
-            "--user-agent=Mozilla/5.0",
+            "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
             "-d", output_dir,
             "-o", filename,
             url
@@ -50,7 +52,9 @@ async def download_with_aria2c(url, output_dir, filename):
             return True
         else:
             logger.error(f"aria2c failed with exit code {process.returncode}")
+            # optionally implement exponential backoff retry here
             return False
+
 
 async def get_song_download_url_by_spotify_url(spotify_url: str):
     """
