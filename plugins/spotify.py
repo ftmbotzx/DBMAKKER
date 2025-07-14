@@ -190,10 +190,13 @@ async def handle_download_all(client, callback_query):
                 continue
 
             title, artist, thumb_url = track_info
+            cancel_keyboard = InlineKeyboardMarkup(
+                [[InlineKeyboardButton("❌ Cancel Download", callback_data=f"cancel_download:{message_id}")]]
+            )
 
             await status_msg.edit(f"⬇️ Downloading song {i} of {total}: **{title}**\n"
                                   f"✅ Sent: {sent_count}\n"
-                                  f"⏳ Remaining: {total - sent_count}")
+                                  f"⏳ Remaining: {total - sent_count}", reply_markup=cancel_keyboard)
 
             try:
                 song_title, song_url = await get_song_download_url_by_spotify_url(spotify_url)
