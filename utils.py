@@ -78,6 +78,7 @@ async def get_song_download_url_by_spotify_url(spotify_url: str):
                         song_data = data["data"]
                         found_title = song_data.get("title")
                         download_url = song_data.get("download")
+                        logger.info(f"newwwwwww download URL from {download_url}") 
                         if download_url:
                             download_url_fixed = urllib.parse.quote(download_url, safe=':/?&=')
                             logger.info(f"Got download URL from {chosen_api}")
