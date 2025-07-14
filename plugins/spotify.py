@@ -352,7 +352,7 @@ async def handle_spotify_link(client, message):
             keyboard = generate_keyboard(songs, track_ids, page=0, playlist_message_id=reply.id)
             await reply.edit_reply_markup(reply_markup=keyboard)
 
-            song_cache[reply.id] = {"songs": songs, "track_ids": track_ids}
+            song_cache[reply.id] = {"songs": songs, "track_ids": track_ids, "playlist_message_id": message.id}
         except Exception as e:
             await message.reply(f"⚠️ Error: {e}")
 
