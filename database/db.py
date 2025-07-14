@@ -13,20 +13,19 @@ class Database:
 
     # ----------- Dump cache methods -------------
 
-    async def get_dump_msg_id(self, track_id: str):
-        doc = await self.col.find_one({"track_id": track_id})
-        if doc:
-            return doc.get("dump_msg_id")
-        return None
-
-    async def save_dump_msg_id(self, track_id: str, dump_msg_id: int):
+    async def save_dump_file_id(self, track_id: str, file_id: str):
+        # Upsert kare: agar document hai to update, nahi to insert
         await self.col.update_one(
             {"track_id": track_id},
-            {"$set": {
-                "dump_msg_id": dump_msg_id,
-                "timestamp": datetime.utcnow()  # optional, for future cleanup
-            }},
+            {"$set": {"file_id": file_id}},
             upsert=True
+        )
+
+    async def get_dump_file_id(self, track_id: str):
+        doc = await self.col.find_one({"track_id": track_id})
+        if doc and "file_id" in doc:
+            return doc["file_id"]
+        return None
         )
 
 # create instance
