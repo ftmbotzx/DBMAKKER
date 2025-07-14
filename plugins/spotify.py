@@ -167,6 +167,10 @@ async def handle_spotify_link(client, message):
         await wait_msg.edit(f"⬇️ Downloading **{song_title}**...")
 
         success = await handle_request(song_url, output_dir, safe_name)
+        final_path = os.path.join(output_dir, safe_name)
+        logging.info("Checking for file:", final_path)
+        logging.info("Dir contents:", os.listdir(output_dir))
+        logging.info("Exists:", os.path.exists(final_path))
         if not success:
             await wait_msg.edit("❌ Failed to download the song.")
             return
