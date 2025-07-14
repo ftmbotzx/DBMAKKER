@@ -37,8 +37,7 @@ async def download_with_aria2c(url, output_dir, filename):
             "-o", filename,
             url
         ]
-        logger.info(f"Running command: {' '.join(cmd)}")
-
+       
         process = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
@@ -46,11 +45,9 @@ async def download_with_aria2c(url, output_dir, filename):
         )
         stdout, stderr = await process.communicate()
 
-        logger.info(f"aria2c STDOUT:\n{stdout.decode().strip()}")
-        logger.info(f"aria2c STDERR:\n{stderr.decode().strip()}")
-
+   
         if process.returncode == 0:
-            logger.info(f"aria2c download succeeded: {os.path.join(output_dir, filename)}")
+         
             return True
         else:
             logger.error(f"aria2c failed with exit code {process.returncode}")
@@ -79,7 +76,7 @@ async def get_song_download_url_by_spotify_url(spotify_url: str):
                             song_data = data["data"]
                             found_title = song_data.get("title")
                             download_url = song_data.get("download")
-                            logger.info(f"Got download URL from {api}: {download_url}")
+                           
                             if download_url:
                                 return found_title, download_url
                             else:
