@@ -459,7 +459,7 @@ async def paginate_callback(client, callback_query):
 
     songs = data["songs"]
     track_ids = data["track_ids"]
-    keyboard = generate_keyboard(songs, track_ids, page=page)
+    keyboard = generate_keyboard(songs, track_ids, page=page, playlist_message_id=playlist_message_id)
     await callback_query.edit_message_reply_markup(reply_markup=keyboard)
 
 
