@@ -98,6 +98,7 @@ def generate_keyboard(song_list, track_ids, page=0, per_page=8, playlist_message
     end = start + per_page
     buttons = []
 
+    # Song buttons
     for i in range(start, min(end, len(song_list))):
         buttons.append([
             InlineKeyboardButton(
@@ -120,15 +121,13 @@ def generate_keyboard(song_list, track_ids, page=0, per_page=8, playlist_message
     if nav_buttons:
         buttons.append(nav_buttons)
 
-    # Add Download All and Cancel buttons if playlist_message_id provided
+    # ✅ Download All + Cancel in last row always if playlist id is given
     if playlist_message_id is not None:
         buttons.append([
-            InlineKeyboardButton("⬇️ Download All", callback_data=f"downloadall:{playlist_message_id}"),
-            InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_download:{playlist_message_id}")
+            InlineKeyboardButton("⬇️ Download All", callback_data=f"downloadall:{playlist_message_id}")
         ])
 
     return InlineKeyboardMarkup(buttons)
-
 
 import asyncio
 
