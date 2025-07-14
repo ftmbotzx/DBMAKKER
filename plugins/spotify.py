@@ -9,7 +9,8 @@ from urllib.parse import urlparse
 from info import USERBOT_CHAT_ID
 import logging
 import urllib.parse
-
+from utils import safe_filename, download_with_aria2c, get_song_download_url_by_spotify_url
+import os
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("pyrogram").setLevel(logging.ERROR)
@@ -22,6 +23,13 @@ auth_manager = SpotifyClientCredentials(client_id=client_id, client_secret=clien
 sp = spotipy.Spotify(auth_manager=auth_manager)
 
 song_cache = {}
+
+safe_name = safe_filename(song_title) + ".mp3"
+output_dir = "/downloads"
+
+
+
+
 
 def extract_track_info(spotify_url: str):
     parsed = urlparse(spotify_url)
@@ -153,19 +161,6 @@ import aiohttp
 
 
 
-import aiohttp
-import logging
-import subprocess
-import os
-import asyncio
-import re
-import urllib.parse
-from pyrogram import Client, filters
-
-
-def safe_filename(name: str) -> str:
-    return re.sub(r'[\\/*?:"<>|]', '_', name)
-
 @Client.on_callback_query(filters.regex("trackid:"))
 async def handle_trackid_click(client, callback_query):
     track_id = callback_query.data.split(":")[1]
@@ -185,8 +180,7 @@ async def handle_trackid_click(client, callback_query):
     if not song_url:
         await wait_msg.edit("❌ Song not found via API.")
         return
-    safe_name = safe_filename(song_title) + ".mp3"
-    output_dir = "/tmp"
+
     download_path = os.path.join(output_dir, safe_name)
     await wait_msg.edit(f"⬇️ Downloading **{song_title}**...")
     success = await download_with_aria2c(song_url, output_dir, safe_name)
