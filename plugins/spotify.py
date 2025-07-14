@@ -441,8 +441,7 @@ async def handle_trackid_click(client, callback_query):
                 await client.forward_messages(
                     chat_id=user_id,
                     audio=dump_file_id,
-                    caption=f"🎵 **{title}**\n👤 {artist}",
-                    message_ids=dump_msg_id
+                    caption=f"🎵 **{title}**\n👤 {artist}"
                 )
                 return
             except Exception as e:
