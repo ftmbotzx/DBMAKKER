@@ -1,16 +1,14 @@
 from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from spotipy.oauth2 import SpotifyClientCredentials
 import spotipy
 import re
 import requests
 import math
 from urllib.parse import urlparse
-from info import USERBOT_CHAT_ID
 import logging
-import urllib.parse
-from utils import safe_filename, download_with_aria2c, get_song_download_url_by_spotify_url, download_thumbnail
 import os
+from utils import safe_filename, download_with_aria2c, get_song_download_url_by_spotify_url, download_thumbnail
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("pyrogram").setLevel(logging.ERROR)
@@ -30,7 +28,7 @@ os.makedirs(output_dir, exist_ok=True)
 
 def extract_track_info(spotify_url: str):
     parsed = urlparse(spotify_url)
-    
+
     if "track" not in parsed.path:
         logging.warning("URL does not contain 'track' in path. Returning None.")
         return None
@@ -45,11 +43,11 @@ def extract_track_info(spotify_url: str):
     title = result['name']
     artist = result['artists'][0]['name']
 
-    # Extract album image (take first image)
     album_images = result['album'].get('images', [])
     image_url = album_images[0]['url'] if album_images else None
 
     return title, artist, image_url
+
 
 def get_playlist_info(playlist_url):
     playlist_id = playlist_url.split("/")[-1].split("?")[0]
@@ -71,7 +69,7 @@ def get_playlist_info(playlist_url):
 
     return image_url, playlist_name, song_list, track_ids
 
-# --- Generate Pagination Buttons ---
+
 def generate_keyboard(song_list, track_ids, page=0, per_page=8):
     start = page * per_page
     end = start + per_page
@@ -101,13 +99,17 @@ def generate_keyboard(song_list, track_ids, page=0, per_page=8):
 
     return InlineKeyboardMarkup(buttons)
 
-# --- Message Handler ---
-@Client.on_message(filters.private & filters.text)
-async def handle_spotify_playlist(client, message):
-    text = message.text.strip()
-    spotify_pattern = r"https?://open\.spotify\.com/playlist/[a-zA-Z0-9]+"
 
-    if re.search(spotify_pattern, text):
+# --- Main Message Handler ---
+@Client.on_message(filters.private & filters.text)
+async def handle_spotify_link(client, message):
+    text = message.text.strip()
+
+    playlist_pattern = r"https?://open\.spotify\.com/playlist/[a-zA-Z0-9]+"
+    track_pattern = r"https?://open\.spotify\.com/track/[a-zA-Z0-9]+"
+
+    if re.search(playlist_pattern, text):
+        # Handle playlist
         await message.reply("⏳ Fetching Spotify playlist info...")
 
         try:
@@ -131,6 +133,85 @@ async def handle_spotify_playlist(client, message):
         except Exception as e:
             await message.reply(f"⚠️ Error: {e}")
 
+    elif re.search(track_pattern, text):
+        # Handle single track directly
+        await message.reply("⏳ Fetching Spotify track info...")
+
+        track_info = extract_track_info(text)
+        if not track_info:
+            await message.reply("⚠️ Could not fetch track info. Please check the link.")
+            return
+
+        title, artist, thumb_url = track_info
+
+        wait_msg = await message.reply(f"🔄 Please wait... fetching your song: **{title}**")
+
+        try:
+            song_title, song_url = await get_song_download_url_by_spotify_url(text)
+        except Exception as e:
+            await wait_msg.edit("⚠️ An error occurred while fetching the song.")
+            return
+
+        if not song_url:
+            await wait_msg.edit("❌ Song not found via API.")
+            return
+
+        safe_name = safe_filename(song_title) + ".mp3"
+        download_path = os.path.join(output_dir, safe_name)
+
+        await wait_msg.edit(f"⬇️ Downloading **{song_title}**...")
+
+        success = await download_with_aria2c(song_url, output_dir, safe_name)
+        if not success:
+            await wait_msg.edit("❌ Failed to download the song.")
+            return
+
+        if not os.path.exists(download_path):
+            await wait_msg.edit("❌ Downloaded file not found.")
+            return
+
+        # Download thumbnail
+        thumb_path = os.path.join(output_dir, safe_filename(song_title) + ".jpg")
+        logging.info(f"download path {thumb_path}")
+        thumb_success = await download_thumbnail(thumb_url, thumb_path)
+
+        try:
+            await wait_msg.edit(f"📤 Uploading **{song_title}**...")
+
+            if thumb_success and os.path.exists(thumb_path):
+                await client.send_audio(
+                    message.chat.id,
+                    download_path,
+                    caption=f"🎵 **{song_title}**\n👤 {artist}",
+                    thumb=thumb_path,
+                    title=song_title,
+                    performer=artist
+                )
+            else:
+                await client.send_audio(
+                    message.chat.id,
+                    download_path,
+                    caption=f"🎵 **{song_title}**\n👤 {artist}",
+                    title=song_title,
+                    performer=artist
+                )
+
+            await wait_msg.delete()
+
+        except Exception as e:
+            await wait_msg.edit("⚠️ Failed to send the song file.")
+
+        finally:
+            if os.path.exists(download_path):
+                os.remove(download_path)
+            if os.path.exists(thumb_path):
+                os.remove(thumb_path)
+
+    else:
+        # If message does not match any Spotify pattern
+        pass
+
+
 # --- Pagination Callback Handler ---
 @Client.on_callback_query(filters.regex("page:"))
 async def paginate_callback(client, callback_query):
@@ -147,21 +228,14 @@ async def paginate_callback(client, callback_query):
     keyboard = generate_keyboard(songs, track_ids, page=page)
     await callback_query.edit_message_reply_markup(reply_markup=keyboard)
 
+
 # --- Dummy Button Handler ---
 @Client.on_callback_query(filters.regex("noop"))
 async def handle_noop(client, callback_query):
     await callback_query.answer("🎵 Downloading soon...", show_alert=False)
 
 
-message_map = {}
-
-from pyrogram.types import InputMediaAudio
-
-
-import aiohttp
-
-
-
+# --- Track ID Callback Handler ---
 @Client.on_callback_query(filters.regex("trackid:"))
 async def handle_trackid_click(client, callback_query):
     track_id = callback_query.data.split(":")[1]
@@ -170,8 +244,13 @@ async def handle_trackid_click(client, callback_query):
 
     await callback_query.answer("🎵 Fetching your song...")
 
-    # ---- Extract title, artist, thumbnail URL from Spotify ----
-    title, artist, thumb_url = extract_track_info(spotify_url)
+    # Extract title, artist, thumbnail URL from Spotify
+    track_info = extract_track_info(spotify_url)
+    if not track_info:
+        await client.send_message(user_id, "⚠️ Failed to fetch track info.")
+        return
+
+    title, artist, thumb_url = track_info
 
     wait_msg = await client.send_message(user_id, "🔄 Please wait... fetching your song.")
 
@@ -199,12 +278,11 @@ async def handle_trackid_click(client, callback_query):
         await wait_msg.edit("❌ Downloaded file not found.")
         return
 
-    # ---- Download the thumbnail using helper ----
+    # Download the thumbnail
     thumb_path = os.path.join(output_dir, safe_filename(song_title) + ".jpg")
     logging.info(f"download path {thumb_path}")
     thumb_success = await download_thumbnail(thumb_url, thumb_path)
 
-    # ---- Upload the audio with thumb if available ----
     try:
         await wait_msg.edit(f"📤 Uploading **{song_title}**...")
 
