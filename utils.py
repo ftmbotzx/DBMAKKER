@@ -67,34 +67,32 @@ async def get_song_download_url_by_spotify_url(spotify_url: str):
         f"https://tet-kpy4.onrender.com/spotify2?url={encoded_url}"
     ]
 
-    chosen_api = random.choice(api_urls)  # Randomly pick one API
+    random.shuffle(api_urls)  # Shuffle for fair chance
 
     async with aiohttp.ClientSession() as session:
-        try:
-            async with session.get(chosen_api, timeout=10) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    if data.get("status") and "data" in data:
-                        song_data = data["data"]
-                        found_title = song_data.get("title")
-                        download_url = song_data.get("download")
-                        logger.info(f"newwwwwww download URL from {download_url}") 
-                        if download_url:
-                            download_url_fixed = urllib.parse.quote(download_url, safe=':/?&=')
-                            logger.info(f"Got download URL from {chosen_api}")
-                            return found_title, download_url_fixed
+        for api in api_urls:
+            try:
+                async with session.get(api, timeout=10) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        if data.get("status") and "data" in data:
+                            song_data = data["data"]
+                            found_title = song_data.get("title")
+                            download_url = song_data.get("download")
+                            logger.info(f"Got download URL from {api}: {download_url}")
+                            if download_url:
+                                return found_title, download_url
+                            else:
+                                logger.warning(f"No download URL in response from {api}")
                         else:
-                            logger.warning(f"No download URL in response from {chosen_api}")
-                            return found_title, None
+                            logger.warning(f"Invalid response data from {api}: {data}")
                     else:
-                        logger.warning(f"Invalid response data from {chosen_api}: {data}")
-                        return None, None
-                else:
-                    logger.error(f"API request failed with status {resp.status} from {chosen_api}")
-                    return None, None
-        except Exception as e:
-            logger.error(f"Exception while requesting {chosen_api}: {e}")
-            return None, None
+                        logger.error(f"API request failed with status {resp.status} from {api}")
+            except Exception as e:
+                logger.error(f"Exception while requesting {api}: {e}")
+
+    return None, None  # Both failed
+
 
 async def download_thumbnail(thumb_url: str, output_path: str) -> bool:
     if not thumb_url:
