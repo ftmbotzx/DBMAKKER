@@ -158,15 +158,12 @@ async def paginate_callback(client, callback_query):
 
 import asyncio
 
-download_all_tasks = {}
-download_all_cancel_flags = {}
-
 @Client.on_callback_query(filters.regex(r"downloadall:(\d+)"))
 async def handle_download_all(client, callback_query):
-    message_id = int(callback_query.data.split(":")[1])
+    playlist_message_id = int(callback_query.data.split(":")[1])
     user_id = callback_query.from_user.id
 
-    data = song_cache.get(message_id)
+    data = song_cache.get(playlist_message_id)
     if not data:
         await callback_query.answer("❌ Playlist data expired.", show_alert=True)
         return
