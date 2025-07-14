@@ -165,6 +165,7 @@ async def handle_download_all(client, callback_query):
 
     data = song_cache.get(playlist_message_id)
     if not data:
+        logging.info(f"data {song_cache} ")
         logging.info(f"take it data {data} //  {user_id} /// {message_id} ")
         await callback_query.answer("❌ Playlist data expired.", show_alert=True)
         return
