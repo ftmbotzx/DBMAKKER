@@ -26,7 +26,7 @@ class Database:
         if doc and "file_id" in doc:
             return doc["file_id"]
         return None
-        )
+        
 
 # create instance
 db = Database()
