@@ -440,7 +440,7 @@ async def handle_trackid_click(client, callback_query):
             try:
                 await client.forward_messages(
                     chat_id=user_id,
-                    audio=dump_file_id,
+                    dump_file_id,
                     caption=f"🎵 **{title}**\n👤 {artist}"
                 )
                 return
