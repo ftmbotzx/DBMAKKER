@@ -411,7 +411,7 @@ async def handle_noop(client, callback_query):
 
 
 
-from db import db  # tera mongo class instance
+from database.db import db  # tera mongo class instance
 
 @Client.on_callback_query(filters.regex("trackid:"))
 async def handle_trackid_click(client, callback_query):
