@@ -144,14 +144,14 @@ async def paginate_callback(client, callback_query):
 
     songs = data["songs"]
     track_ids = data["track_ids"]
-    playlist_message_id = data.get("playlist_message_id")  # ✅ Yeh line zaroori hai!
+    playlist_message_id = data.get("playlist_message_id")
 
     keyboard = generate_keyboard(
         songs,
         track_ids,
         page=page,
         per_page=8,
-        playlist_message_id=playlist_message_id   # ✅ Ab hamesha jayega!
+        playlist_message_id=playlist_message_id
     )
 
     await callback_query.edit_message_reply_markup(reply_markup=keyboard)
@@ -173,6 +173,7 @@ async def handle_download_all(client, callback_query):
 
     songs = data["songs"]
     track_ids = data["track_ids"]
+    playlist_message_id = data["playlist_message_id"]
 
     key = (user_id, message_id)
     if key in download_all_tasks:
@@ -204,7 +205,7 @@ async def handle_download_all(client, callback_query):
                     await status_msg.edit(f"⬇️ Sending cached song {i} of {total}\n"
                                           f"✅ Sent: {sent_count}\n"
                                           f"⏳ Remaining: {total - sent_count}")
-                    continue  # next song
+                    continue
                 except Exception as e:
                     logging.info(f"Failed to send cached song {track_id}: {e}")
                     await db.col.delete_one({"track_id": track_id})  # remove broken cache
