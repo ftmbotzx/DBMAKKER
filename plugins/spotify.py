@@ -376,7 +376,7 @@ async def handle_spotify_link(client, message):
             dump_caption = f"🎵 **{song_title}**\n👤 {artist}\n🆔 {track_id}"
             dump_msg = await client.send_audio(
                 DUMP_CHANNEL_ID,
-                download_path,
+                audio=sent_msg.audio.file_id,,
                 caption=dump_caption,
                 thumb=thumb_path if thumb_success and os.path.exists(thumb_path) else None,
                 title=song_title,
