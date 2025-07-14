@@ -24,10 +24,8 @@ sp = spotipy.Spotify(auth_manager=auth_manager)
 
 song_cache = {}
 
-
-output_dir = "/downloads"
+output_dir = os.path.join(os.getcwd(), "downloads")
 os.makedirs(output_dir, exist_ok=True)
-
 
 
 def extract_track_info(spotify_url: str):
