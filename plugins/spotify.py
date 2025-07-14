@@ -89,7 +89,7 @@ def get_playlist_info(playlist_url):
 
 import asyncio
 
-# Store ongoing download all tasks per user-message_id to support cancellation
+
 download_all_tasks = {}
 download_all_cancel_flags = {}
 
@@ -159,10 +159,10 @@ import asyncio
 
 @Client.on_callback_query(filters.regex(r"downloadall:(\d+)"))
 async def handle_download_all(client, callback_query):
-    playlist_message_id = int(callback_query.data.split(":")[1])
+    message_id = int(callback_query.data.split(":")[1])
     user_id = callback_query.from_user.id
 
-    data = song_cache.get(playlist_message_id)
+    data = song_cache.get(user_id)
     if not data:
         await callback_query.answer("❌ Playlist data expired.", show_alert=True)
         return
