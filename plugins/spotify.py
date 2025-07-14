@@ -157,36 +157,53 @@ async def handle_trackid_click(client, callback_query):
     track_id = callback_query.data.split(":")[1]
     user_id = callback_query.from_user.id
 
+    logger.info(f"User {user_id} requested track ID: {track_id}")
+
     await callback_query.answer("🎵 Fetching your song...")
     wait_msg = await client.send_message(user_id, "🔄 Please wait... fetching your song.")
 
     spotify_url = f"https://open.spotify.com/track/{track_id}"
+    logger.info(f"Constructed Spotify URL: {spotify_url}")
 
-    # Pass full spotify url to the new API wrapper function
-    song_title, song_url = await get_song_download_url_by_spotify_url(spotify_url)
+    try:
+        song_title, song_url = await get_song_download_url_by_spotify_url(spotify_url)
+    except Exception as e:
+        logger.error(f"Error fetching song URL: {e}")
+        await wait_msg.edit("⚠️ An error occurred while fetching the song.")
+        return
 
     if not song_url:
+        logger.warning(f"Song not found for Spotify URL: {spotify_url}")
         await wait_msg.edit("❌ Song not found via API.")
         return
 
+    logger.info(f"Found song '{song_title}' with download URL: {song_url}")
     await wait_msg.edit(f"✅ Found: **{song_title}**\n🔗 [Listen/Download]({song_url})", disable_web_page_preview=False)
 
 
 async def get_song_download_url_by_spotify_url(spotify_url: str):
-    import urllib.parse
     encoded_url = urllib.parse.quote(spotify_url)
     api_url = f"https://tet-kpy4.onrender.com/spotify?url={encoded_url}"
 
+    logger.info(f"Calling API: {api_url}")
+
     async with aiohttp.ClientSession() as session:
         async with session.get(api_url) as resp:
+            logger.info(f"API responded with status: {resp.status}")
             if resp.status == 200:
                 data = await resp.json()
+                logger.debug(f"API response JSON: {data}")
+
                 if data.get("status") and "data" in data:
                     song_data = data["data"]
                     found_title = song_data.get("title")
                     download_url = song_data.get("download")
+
+                    logger.info(f"API returned song title: {found_title}")
                     return found_title, download_url
                 else:
+                    logger.warning(f"API response missing expected data or status is false: {data}")
                     return None, None
             else:
+                logger.error(f"API request failed with status code: {resp.status}")
                 return None, None
