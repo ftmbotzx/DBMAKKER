@@ -13,15 +13,12 @@ def safe_filename(name: str) -> str:
     """Remove unsafe filesystem characters from a filename."""
     return re.sub(r'[\\/*?:"<>|]', '_', name)
 
-import asyncio
 
-aria2c_semaphore = asyncio.Semaphore(1)  # max 1 parallel
+aria2c_semaphore = asyncio.Semaphore(1)
+download_queue = asyncio.Queue()
 
 async def download_with_aria2c(url, output_dir, filename):
     async with aria2c_semaphore:
-        # optional small delay before starting
-        await asyncio.sleep(1)
-
         cmd = [
             "aria2c",
             "-x", "2",
@@ -30,12 +27,12 @@ async def download_with_aria2c(url, output_dir, filename):
             "--max-tries=5",
             "--retry-wait=5",
             "--timeout=60",
-            "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+            "--user-agent=Mozilla/5.0",
             "-d", output_dir,
             "-o", filename,
             url
         ]
-        logger.info(f"Running command: {' '.join(cmd)}")
+        print(f"Running command: {' '.join(cmd)}")
 
         process = await asyncio.create_subprocess_exec(
             *cmd,
@@ -44,16 +41,29 @@ async def download_with_aria2c(url, output_dir, filename):
         )
         stdout, stderr = await process.communicate()
 
-        logger.info(f"aria2c STDOUT:\n{stdout.decode().strip()}")
-        logger.info(f"aria2c STDERR:\n{stderr.decode().strip()}")
+        print(f"STDOUT:\n{stdout.decode().strip()}")
+        print(f"STDERR:\n{stderr.decode().strip()}")
 
         if process.returncode == 0:
-            logger.info(f"aria2c download succeeded: {os.path.join(output_dir, filename)}")
-            return True
+            print(f"✅ aria2c download succeeded: {os.path.join(output_dir, filename)}")
         else:
-            logger.error(f"aria2c failed with exit code {process.returncode}")
-            # optionally implement exponential backoff retry here
-            return False
+            print(f"❌ aria2c failed with exit code {process.returncode}")
+
+async def download_worker():
+    while True:
+        url, output_dir, filename = await download_queue.get()
+        await download_with_aria2c(url, output_dir, filename)
+        await asyncio.sleep(1)
+        download_queue.task_done()
+
+
+
+# Example: Add to queue
+async def handle_request(url, output_dir, filename):
+    await download_queue.put((url, output_dir, filename))
+    return {"status": "queued"}
+
+
 
 
 async def get_song_download_url_by_spotify_url(spotify_url: str):
@@ -85,7 +95,6 @@ async def get_song_download_url_by_spotify_url(spotify_url: str):
             else:
                 logger.error(f"API request failed with status code: {resp.status}")
                 return None, None
-
 
 
 
