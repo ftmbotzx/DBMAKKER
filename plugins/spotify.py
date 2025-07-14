@@ -135,7 +135,7 @@ async def handle_spotify_link(client, message):
 
     elif re.search(track_pattern, text):
         # Handle single track directly
-        await message.reply("⏳ Fetching Spotify track info...")
+        ansh = await message.reply("⏳ Fetching Spotify track info...")
 
         track_info = extract_track_info(text)
         if not track_info:
@@ -145,6 +145,7 @@ async def handle_spotify_link(client, message):
         title, artist, thumb_url = track_info
 
         wait_msg = await message.reply(f"🔄 Please wait... fetching your song: **{title}**")
+        await ansh.delete()
 
         try:
             song_title, song_url = await get_song_download_url_by_spotify_url(text)
