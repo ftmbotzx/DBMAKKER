@@ -6,6 +6,7 @@ RUN apt update && apt install -y ffmpeg aria2
 RUN apt-get update && apt-get install -y git
 
 RUN pip install --no-cache-dir spotdl
+RUN pip install yt-dlp
 
 COPY . .
 
