@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Folder Name
-DIR="SpotifyDL"
+DIR="DBMAKKER"
 
 
 
@@ -15,10 +15,10 @@ fi
 
 # Pull the latest updates
 echo "🔄 Updating repository..."
-git pull https://github.com/Anshvachhani998/SpotifyDL
+git pull https://github.com/Anshvachhani998/DBMAKKER
 
 # Restart Docker Container
-echo "🚀 Restarting SpotifyDL Docker container..."
-docker restart SpotifyDL
+echo "🚀 Restarting DBMAKKER Docker container..."
+docker restart DBMAKKER
 
 echo "✅ Update & Restart Completed!"
