@@ -3,6 +3,7 @@ import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 import re
 import logging
+import asyncio
 
 logging.basicConfig(
     level=logging.INFO,
@@ -16,6 +17,7 @@ auth_manager = SpotifyClientCredentials(client_id=client_id, client_secret=clien
 sp = spotipy.Spotify(auth_manager=auth_manager)
 
 app = Client
+
 def extract_artist_id(url):
     match = re.search(r"artist/([a-zA-Z0-9]+)", url)
     if match:
@@ -35,87 +37,69 @@ async def artist_songs(client, message):
         await message.reply("Invalid Spotify artist link. Please send a correct link.")
         return
 
-    await message.reply("Fetching artist's global songs and albums data, please wait...")
+    status_msg = await message.reply("⏳ Fetching artist tracks, please wait...")
 
     try:
-        # Fetch albums (only albums)
+        # Albums
         albums = []
         results_albums = sp.artist_albums(artist_id, album_type='album', limit=50)
         albums.extend(results_albums['items'])
         while results_albums['next']:
             results_albums = sp.next(results_albums)
             albums.extend(results_albums['items'])
-        album_ids = set(album['id'] for album in albums)
-        total_albums = len(album_ids)
-        logger.info(f"Total albums fetched: {total_albums}")
 
-        # Fetch singles (only singles)
+        # Singles
         singles = []
         results_singles = sp.artist_albums(artist_id, album_type='single', limit=50)
         singles.extend(results_singles['items'])
         while results_singles['next']:
             results_singles = sp.next(results_singles)
             singles.extend(results_singles['items'])
+
+        album_ids = set(album['id'] for album in albums)
         single_ids = set(single['id'] for single in singles)
-        total_singles = len(single_ids)
-        logger.info(f"Total singles fetched: {total_singles}")
 
-        # Get tracks from albums
-        album_tracks = set()
-        for album_id in album_ids:
-            tracks = sp.album_tracks(album_id)
+        all_album_ids = album_ids.union(single_ids)
+
+        logger.info(f"Total releases: {len(all_album_ids)}")
+
+        all_tracks = []
+
+        # Collect all tracks IDs and names
+        for release_id in all_album_ids:
+            tracks = sp.album_tracks(release_id)
             for track in tracks['items']:
-                album_tracks.add(track['id'])
-        total_songs_albums = len(album_tracks)
-        logger.info(f"Total songs from albums: {total_songs_albums}")
+                all_tracks.append((track['id'], track['name']))
 
-        # Get tracks from singles
-        single_tracks = set()
-        for single_id in single_ids:
-            tracks = sp.album_tracks(single_id)
-            for track in tracks['items']:
-                single_tracks.add(track['id'])
-        total_songs_singles = len(single_tracks)
-        logger.info(f"Total songs from singles: {total_songs_singles}")
+        total_tracks = len(all_tracks)
+        logger.info(f"Total unique tracks: {total_tracks}")
 
-        # Combine all tracks
-        all_tracks = album_tracks.union(single_tracks)
-        total_unique_songs = len(all_tracks)
-        logger.info(f"Total unique songs (albums + singles): {total_unique_songs}")
+        # Batch write and send
+        batch_size = 100
+        batches = [all_tracks[i:i + batch_size] for i in range(0, total_tracks, batch_size)]
 
-        original_count = 0
-        non_original_count = 0
-        artist_name_lower = sp.artist(artist_id)['name'].lower()
+        artist_name = sp.artist(artist_id)['name'].replace(" ", "_")
+        file_prefix = f"{artist_name}_tracks"
 
-        for track_id in all_tracks:
-            track = sp.track(track_id)
-            artists = [artist['name'].lower() for artist in track['artists']]
-            main_artist = artists[0]
+        for index, batch in enumerate(batches, start=1):
+            file_name = f"{file_prefix}_part_{index}.txt"
 
-            if artist_name_lower in artists:
-                if main_artist == artist_name_lower:
-                    original_count += 1
-                else:
-                    non_original_count += 1
+            with open(file_name, "w", encoding="utf-8") as f:
+                for track_id, track_name in batch:
+                    f.write(f"{track_id} | {track_name}\n")
 
-        artist_info = sp.artist(artist_id)
-        artist_name = artist_info['name']
+            await client.send_document(
+                chat_id=message.chat.id,
+                document=file_name,
+                caption=f"✅ Batch {index} ({len(batch)} tracks)"
+            )
 
-        reply_text = (
-            f"👤 **Artist:** {artist_name}\n\n"
-            f"🌏 **Global Albums & Singles Summary:**\n"
-            f"• Total Albums: {total_albums}\n"
-            f"• Total Singles: {total_singles}\n"
-            f"• Total Songs from Albums: {total_songs_albums}\n"
-            f"• Total Songs from Singles: {total_songs_singles}\n"
-            f"• 🎵 Total Unique Songs (Albums + Singles): {total_unique_songs}\n"
-            f"• 🎤 Original Songs (Primary Artist): {original_count}\n"
-            f"• 🤝 Other Songs (Featuring/Remix/Collab): {non_original_count}\n"
-        )
+            logger.info(f"Sent batch {index}")
+            await asyncio.sleep(3)  # Wait 3 sec to avoid rate limits
 
-        logger.info("Final summary prepared and sending reply.")
-        await message.reply(reply_text)
+        await status_msg.edit(f"✅ Done! Total tracks: {total_tracks}")
 
     except Exception as e:
-        logger.error(f"Error occurred: {e}")
-        await message.reply(f"❌ Error occurred: `{e}`")
+        logger.error(f"Error: {e}")
+        await status_msg.edit(f"❌ Error: `{e}`")
+
