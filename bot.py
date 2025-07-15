@@ -46,8 +46,7 @@ class Bot(Client):
         await super().start()
         me = await self.get_me()
         logging.info(f"🤖 {me.first_name} (@{me.username}) running on Pyrogram v{__version__} (Layer {layer})")
-        asyncio.create_task(schedule_task_reset(self))
-        self.loop.create_task(check_expired_premium(self))
+       
         tz = pytz.timezone('Asia/Kolkata')
         today = date.today()
         now = datetime.now(tz)
