@@ -1,8 +1,8 @@
 version: '3'
 services:
-  spotifydl:
+  DBMAKKER:
     build: .
-    container_name: SpotifyDL
+    container_name: DBMAKKER
     restart: always
     volumes:
       - .:/app
