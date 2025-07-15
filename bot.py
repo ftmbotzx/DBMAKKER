@@ -16,7 +16,7 @@ from pyrogram.raw.all import layer
 
 from plugins import web_server
 from info import SESSION, API_ID, API_HASH, BOT_TOKEN, LOG_CHANNEL, PORT, USER_SESSION, ADMINS
-from plugins.spotify import extract_track_info
+
 
 # Logging setup
 logging.basicConfig(level=logging.INFO)
@@ -26,11 +26,6 @@ logging.getLogger("pyrogram").setLevel(logging.ERROR)
 pyroutils.MIN_CHAT_ID = -999999999999
 pyroutils.MIN_CHANNEL_ID = -100999999999999
 
-# Message Queue Setup
-queue = deque()
-processing = False
-message_map = {}
-expected_tracks = {}
 
 
 # ------------------ Bot Class ------------------ #
