@@ -3,11 +3,11 @@ import os
 SESSION = "spotifydl"
 API_ID = int(os.getenv("API_ID", "8012239"))
 API_HASH = os.getenv("API_HASH", "171e6f1bf66ed8dcc5140fbe827b6b08")
-BOT_TOKEN = os.getenv("BOT_TOKEN", "6538627123:AAHnqmZSyi5iIfEepdL82oPXtWp13FHsrU8")
-LOG_CHANNEL = int(os.getenv("LOG_CHANNEL", "-1002284232975"))
-DUMP_CHANNEL_ID = int(os.getenv("DUMP_CHANNEL_ID", "-1002284232975"))
+BOT_TOKEN = os.getenv("BOT_TOKEN", "7277194738:AAE8MNvsbdO7o46NZjO89I_2gdKIYqrDFDQ")
+LOG_CHANNEL = int(os.getenv("LOG_CHANNEL", "-1002884716564"))
+DUMP_CHANNEL_ID = int(os.getenv("DUMP_CHANNEL_ID", "-1002884716564"))
 PORT = int(os.getenv("PORT", "8080"))
-FORCE_CHANNEL = int(os.getenv("FORCE_CHANNEL", "-1002379643238"))
+FORCE_CHANNEL = int(os.getenv("FORCE_CHANNEL", "-1002884716564"))
 MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://Ansh089:Ansh089@cluster0.y8tpouc.mongodb.net/?retryWrites=true&w=majority")
 MONGO_NAME = os.getenv("MONGO_NAME", "SpotifyDL")
 ADMINS = [5660839376, 6167872503, 5961011848, 6538627123]
