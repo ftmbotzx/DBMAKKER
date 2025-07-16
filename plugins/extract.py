@@ -18,7 +18,7 @@ def extract_user_id(url):
 @Client.on_message(filters.command("ur"))
 async def user_tracks_split(client, message):
     if len(message.command) < 2:
-        await message.reply("❗ Usage: `/usertracksplit <spotify_user_link>`")
+        await message.reply("❗ Usage: `/ur <spotify_user_link>`")
         return
 
     user_url = message.command[1]
@@ -29,17 +29,29 @@ async def user_tracks_split(client, message):
         return
 
     try:
+        status = await message.reply(f"⏳ Fetching playlists for `{user_id}`...")
+
         playlists = sp.user_playlists(user_id)
         if not playlists['items']:
-            await message.reply("⚠️ No public playlists found for this user.")
+            await status.edit("⚠️ No public playlists found for this user.")
             return
 
         all_ids = []
         total_tracks = 0
+        total_playlists = 0
 
         while playlists:
             for playlist in playlists['items']:
+                total_playlists += 1
+                pname = playlist['name']
                 pid = playlist['id']
+
+                await status.edit(
+                    f"🔍 Processing playlist: **{pname}**\n"
+                    f"✅ Playlists done: {total_playlists}\n"
+                    f"🎵 Tracks so far: {total_tracks}"
+                )
+
                 tracks = sp.playlist_tracks(pid)
 
                 while tracks:
@@ -49,6 +61,14 @@ async def user_tracks_split(client, message):
                             tid = track['id']
                             all_ids.append(tid)
                             total_tracks += 1
+
+                            # Optionally: update progress every 1000 tracks
+                            if total_tracks % 200 == 0:
+                                await status.edit(
+                                    f"📦 Still fetching...\n"
+                                    f"✅ Playlists done: {total_playlists}\n"
+                                    f"🎵 Tracks so far: {total_tracks}"
+                                )
 
                     if tracks['next']:
                         tracks = sp.next(tracks)
@@ -71,13 +91,16 @@ async def user_tracks_split(client, message):
                 for tid in chunk:
                     f.write(f"{tid}\n")
 
-            await message.reply_document(
-                file_name,
+            await client.send_document(
+                chat_id=message.chat.id,
+                document=file_name,
                 caption=f"✅ `{user_id}` | Part {part_number} | {len(chunk)} track IDs"
             )
             part_number += 1
 
-        await message.reply(f"🎉 **Done!** Total tracks found: `{total_tracks}` split in `{len(chunks)}` parts.")
+        await status.edit(
+            f"🎉 **Done!** Total playlists: `{total_playlists}` | Total tracks: `{total_tracks}` | Files: `{len(chunks)}`"
+        )
 
     except Exception as e:
-        await message.reply(f"❌ Error: `{e}`")
+        await status.edit(f"❌ Error: `{e}`")
