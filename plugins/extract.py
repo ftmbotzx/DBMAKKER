@@ -120,3 +120,62 @@ async def artist_songs(client, message):
     except Exception as e:
         logger.error(f"Error: {e}")
         await status_msg.edit(f"❌ Error: `{e}`")
+
+
+
+
+
+from pyrogram import Client, filters
+import spotipy
+from spotipy.oauth2 import SpotifyClientCredentials
+import re
+
+# Spotify credentials
+client_id = "e54b28b15f574338a709fdbde414b428"
+client_secret = "7dead9452e6546fabdc9ad09ed00f172"
+
+auth_manager = SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
+sp = spotipy.Spotify(auth_manager=auth_manager)
+
+# Regex to extract user ID from Spotify URL
+def extract_user_id(url):
+    match = re.search(r"spotify\.com/user/([a-zA-Z0-9]+)", url)
+    if match:
+        return match.group(1)
+    return None
+
+@Client.on_message(filters.command("userpl"))
+async def user_playlists(client, message):
+    if len(message.command) < 2:
+        await message.reply("❗ Usage: `/userpl <spotify_user_link>`")
+        return
+
+    user_url = message.command[1]
+    user_id = extract_user_id(user_url)
+
+    if not user_id:
+        await message.reply("⚠️ Invalid Spotify user link!")
+        return
+
+    try:
+        playlists = sp.user_playlists(user_id)
+        if not playlists['items']:
+            await message.reply("⚠️ No public playlists found for this user.")
+            return
+
+        text = f"🎵 **Public playlists by `{user_id}`:**\n\n"
+        while playlists:
+            for playlist in playlists['items']:
+                name = playlist['name']
+                url = playlist['external_urls']['spotify']
+                text += f"• [{name}]({url})\n"
+            if playlists['next']:
+                playlists = sp.next(playlists)
+            else:
+                playlists = None
+
+        await message.reply(text, disable_web_page_preview=True)
+
+    except Exception as e:
+        await message.reply(f"❌ Error: `{e}`")
+
