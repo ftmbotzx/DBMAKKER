@@ -10,15 +10,15 @@ auth_manager = SpotifyClientCredentials(client_id=client_id, client_secret=clien
 sp = spotipy.Spotify(auth_manager=auth_manager)
 
 def extract_user_id(url):
-    match = re.search(r"spotify\.com/user/([a-zA-Z0-9]+)", url)
+    match = re.search(r"spotify\\.com/user/([a-zA-Z0-9]+)", url)
     if match:
         return match.group(1)
     return None
 
-@Client.on_message(filters.command("userpl"))
-async def user_playlists(client, message):
+@Client.on_message(filters.command("usercount"))
+async def user_count(client, message):
     if len(message.command) < 2:
-        await message.reply("❗ Usage: `/userpl <spotify_user_link>`")
+        await message.reply("❗ Usage: `/usercount <spotify_user_link>`")
         return
 
     user_url = message.command[1]
@@ -34,31 +34,22 @@ async def user_playlists(client, message):
             await message.reply("⚠️ No public playlists found for this user.")
             return
 
-        text = f"Public playlists by `{user_id}`:\n\n"
-        total_count = 0
+        total_playlists = 0
+        total_tracks = 0
 
         while playlists:
             for playlist in playlists['items']:
-                name = playlist['name']
-                url = playlist['external_urls']['spotify']
-                text += f"{url}\n"
-                total_count += 1
+                total_playlists += 1
+                total_tracks += playlist['tracks']['total']
             if playlists['next']:
                 playlists = sp.next(playlists)
             else:
                 playlists = None
 
-        text += f"\nTotal Public Playlists: {total_count}"
-
-        # Save to file
-        file_name = f"{user_id}_playlists.txt"
-        with open(file_name, "w", encoding="utf-8") as f:
-            f.write(text)
-
-        # Send file
-        await message.reply_document(
-            file_name,
-            caption=f"✅ Found `{total_count}` public playlists for `{user_id}`"
+        await message.reply(
+            f"👤 **User:** `{user_id}`\n"
+            f"📚 **Total Playlists:** {total_playlists}\n"
+            f"🎵 **Total Tracks in All Playlists:** {total_tracks}"
         )
 
     except Exception as e:
