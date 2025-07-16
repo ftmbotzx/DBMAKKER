@@ -15,7 +15,7 @@ def extract_user_id(url):
         return match.group(1)
     return None
 
-@Client.on_message(filters.command("usertracksplit"))
+@Client.on_message(filters.command("ur"))
 async def user_tracks_split(client, message):
     if len(message.command) < 2:
         await message.reply("❗ Usage: `/usertracksplit <spotify_user_link>`")
