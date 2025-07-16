@@ -15,10 +15,10 @@ def extract_user_id(url):
         return match.group(1)
     return None
 
-@Client.on_message(filters.command("usercount"))
-async def user_count(client, message):
+@Client.on_message(filters.command("usertracksplit"))
+async def user_tracks_split(client, message):
     if len(message.command) < 2:
-        await message.reply("❗ Usage: `/usercount <spotify_user_link>`")
+        await message.reply("❗ Usage: `/usertracksplit <spotify_user_link>`")
         return
 
     user_url = message.command[1]
@@ -34,23 +34,50 @@ async def user_count(client, message):
             await message.reply("⚠️ No public playlists found for this user.")
             return
 
-        total_playlists = 0
+        all_ids = []
         total_tracks = 0
 
         while playlists:
             for playlist in playlists['items']:
-                total_playlists += 1
-                total_tracks += playlist['tracks']['total']
+                pid = playlist['id']
+                tracks = sp.playlist_tracks(pid)
+
+                while tracks:
+                    for item in tracks['items']:
+                        track = item['track']
+                        if track:
+                            tid = track['id']
+                            all_ids.append(tid)
+                            total_tracks += 1
+
+                    if tracks['next']:
+                        tracks = sp.next(tracks)
+                    else:
+                        tracks = None
+
             if playlists['next']:
                 playlists = sp.next(playlists)
             else:
                 playlists = None
 
-        await message.reply(
-            f"👤 **User:** `{user_id}`\n"
-            f"📚 **Total Playlists:** {total_playlists}\n"
-            f"🎵 **Total Tracks in All Playlists:** {total_tracks}"
-        )
+        # Split into chunks of 5000
+        chunk_size = 5000
+        chunks = [all_ids[i:i + chunk_size] for i in range(0, len(all_ids), chunk_size)]
+
+        part_number = 1
+        for chunk in chunks:
+            file_name = f"{user_id}_tracks_part{part_number}.txt"
+            with open(file_name, "w", encoding="utf-8") as f:
+                for tid in chunk:
+                    f.write(f"{tid}\n")
+
+            await message.reply_document(
+                file_name,
+                caption=f"✅ `{user_id}` | Part {part_number} | {len(chunk)} track IDs"
+            )
+            part_number += 1
+
+        await message.reply(f"🎉 **Done!** Total tracks found: `{total_tracks}` split in `{len(chunks)}` parts.")
 
     except Exception as e:
         await message.reply(f"❌ Error: `{e}`")
