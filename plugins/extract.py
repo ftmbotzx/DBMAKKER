@@ -41,7 +41,7 @@ async def user_playlists(client, message):
             for playlist in playlists['items']:
                 name = playlist['name']
                 url = playlist['external_urls']['spotify']
-                text += f"{name} - {url}\n"
+                text += f"{url}\n"
                 total_count += 1
             if playlists['next']:
                 playlists = sp.next(playlists)
