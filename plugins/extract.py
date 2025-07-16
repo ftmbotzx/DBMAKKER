@@ -10,7 +10,7 @@ auth_manager = SpotifyClientCredentials(client_id=client_id, client_secret=clien
 sp = spotipy.Spotify(auth_manager=auth_manager)
 
 def extract_user_id(url):
-    match = re.search(r"spotify\\.com/user/([a-zA-Z0-9]+)", url)
+    match = re.search(r"spotify\.com/user/([a-zA-Z0-9]+)", url)
     if match:
         return match.group(1)
     return None
