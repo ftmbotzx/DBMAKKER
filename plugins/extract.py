@@ -132,7 +132,6 @@ def extract_user_id(url):
     if match:
         return match.group(1)
     return None
-
 @Client.on_message(filters.command("userpl"))
 async def user_playlists(client, message):
     if len(message.command) < 2:
@@ -152,19 +151,24 @@ async def user_playlists(client, message):
             await message.reply("⚠️ No public playlists found for this user.")
             return
 
-        text = f"🎵 **Public playlists by `{user_id}`:**\n\n"
+        text = f"Public playlists by `{user_id}`:\n\n"
         while playlists:
             for playlist in playlists['items']:
                 name = playlist['name']
                 url = playlist['external_urls']['spotify']
-                text += f"• [{name}]({url})\n"
+                text += f"{name} - {url}\n"
             if playlists['next']:
                 playlists = sp.next(playlists)
             else:
                 playlists = None
 
-        await message.reply(text, disable_web_page_preview=True)
+        # Save to file
+        file_name = f"{user_id}_playlists.txt"
+        with open(file_name, "w", encoding="utf-8") as f:
+            f.write(text)
+
+        # Send file
+        await message.reply_document(file_name, caption=f"✅ Here is the playlist file for `{user_id}`")
 
     except Exception as e:
         await message.reply(f"❌ Error: `{e}`")
-
