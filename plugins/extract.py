@@ -104,3 +104,44 @@ async def user_tracks_split(client, message):
 
     except Exception as e:
         await status.edit(f"❌ Error: `{e}`")
+
+
+@Client.on_message(filters.command("user"))
+async def usernn_count(client, message):
+    if len(message.command) < 2:
+        await message.reply("❗ Usage: `/usercount <spotify_user_link>`")
+        return
+
+    user_url = message.command[1]
+    user_id = extract_user_id(user_url)
+
+    if not user_id:
+        await message.reply("⚠️ Invalid Spotify user link!")
+        return
+
+    try:
+        playlists = sp.user_playlists(user_id)
+        if not playlists['items']:
+            await message.reply("⚠️ No public playlists found for this user.")
+            return
+
+        total_playlists = 0
+        total_tracks = 0
+
+        while playlists:
+            for playlist in playlists['items']:
+                total_playlists += 1
+                total_tracks += playlist['tracks']['total']
+            if playlists['next']:
+                playlists = sp.next(playlists)
+            else:
+                playlists = None
+
+        await message.reply(
+            f"👤 **User:** `{user_id}`\n"
+            f"📚 **Total Playlists:** {total_playlists}\n"
+            f"🎵 **Total Tracks in All Playlists:** {total_tracks}"
+        )
+
+    except Exception as e:
+        await message.reply(f"❌ Error: `{e}`")
