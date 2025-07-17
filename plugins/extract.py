@@ -164,44 +164,49 @@ async def search_track_id_from_text(query):
 @Client.on_message(filters.command("id") & filters.reply)
 async def get_spotify_track_id(client, message):
     reply = message.reply_to_message
-    if not message.reply_to_message.audio:
+    if not reply.audio:
         await message.reply("❗Please reply to a music/audio file.")
         return
 
-    audio = message.reply_to_message.audio
+    audio = reply.audio
     duration = audio.duration or 0
 
     if duration > 1:
         await message.reply("⛔ Skipping. Duration is already valid.")
         return
 
-    caption = message.reply_to_message.caption or ""
+    caption = reply.caption or ""
     track_id = extract_track_id_from_url(caption)
     file_id = reply.audio.file_id
 
     if not track_id:
-        # Try searching from "Artist - Title"
         search_text = f"{audio.performer or ''} {audio.title or ''}".strip()
         track_id, duration_ms = await search_track_id_from_text(search_text)
         if not track_id:
             await message.reply("❌ Could not find track on Spotify.")
             return
+        track = sp.track(track_id)
     else:
         track = sp.track(track_id)
         duration_ms = track["duration_ms"]
 
-    duration_sec = duration_ms // 1000
-    duration_secs = int(duration_ms / 1000)
+    duration_sec = int(duration_ms / 1000)
     minutes = duration_sec // 60
     seconds = duration_sec % 60
 
-    reply = f"✅ **Spotify Track Info**\n"
-    reply += f"🎵 **Track ID:** `{track_id} {file_id}`\n"
-    reply += f"⏱ **Duration:** `{minutes}:{seconds:02d}`"
+    response_text = (
+        f"✅ **Spotify Track Info**\n"
+        f"🎵 **Track ID:** `{track_id} {file_id}`\n"
+        f"⏱ **Duration:** `{minutes}:{seconds:02d}`"
+    )
 
-    await message.reply(reply)
+    await message.reply(response_text)
     await message.reply_audio(
-            audio=reply.audio.file_id,
-            duration=duration_secs,
-            caption=f"✅ Fixed duration from Spotify\n🎵 {track['name']} - {track['artists'][0]['name']}\n🔗 https://open.spotify.com/track/{track_id}"
+        audio=file_id,
+        duration=duration_sec,
+        caption=(
+            f"✅ Fixed duration from Spotify\n"
+            f"🎵 {track['name']} - {track['artists'][0]['name']}\n"
+            f"🔗 https://open.spotify.com/track/{track_id}"
         )
+    )
