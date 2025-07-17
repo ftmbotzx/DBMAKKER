@@ -191,6 +191,7 @@ async def get_spotify_track_id(client, message):
         duration_ms = track["duration_ms"]
 
     duration_sec = duration_ms // 1000
+    duration_secs = int(duration_ms / 1000)
     minutes = duration_sec // 60
     seconds = duration_sec % 60
 
@@ -201,6 +202,6 @@ async def get_spotify_track_id(client, message):
     await message.reply(reply)
     await message.reply_audio(
             audio=reply.audio.file_id,
-            duration=duration_sec,
+            duration=duration_secs,
             caption=f"✅ Fixed duration from Spotify\n🎵 {track['name']} - {track['artists'][0]['name']}\n🔗 https://open.spotify.com/track/{track_id}"
         )
