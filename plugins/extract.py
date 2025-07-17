@@ -210,3 +210,32 @@ async def get_spotify_track_id(client, message):
             f"🔗 https://open.spotify.com/track/{track_id}///  {duration_sec}  "
         )
     )
+
+
+@Client.on_message(filters.command("index") & filters.private)
+async def index_channel(client, message):
+    if len(message.command) < 2:
+        await message.reply("Please provide channel username or ID.\nUsage: /index @channelusername")
+        return
+
+    channel = message.command[1]
+    try:
+        messages = await client.get_messages(channel, limit=100)
+    except Exception as e:
+        await message.reply(f"Error fetching messages: {e}")
+        return
+
+    if not messages:
+        await message.reply("No messages found in the channel.")
+        return
+
+    start_id = messages[-1].message_id  # oldest message in fetched list
+    end_id = messages[0].message_id     # newest message in fetched list
+    count = len(messages)
+
+    reply_text = (
+        f"Fetched {count} messages from {channel}\n"
+        f"Start Message ID: {start_id}\n"
+        f"End Message ID: {end_id}"
+    )
+    await message.reply(reply_text)
