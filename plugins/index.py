@@ -192,7 +192,7 @@ async def index_files_to_db(lst_msg_id, chat, msg, bot):
 
                 media.file_type = message.media.value
                 media.caption = message.caption
-                aynav, vnay = await db.save_file(bot, media)
+                aynav, vnay = await db.save_file(bot, message.audio, message)
                 if aynav:
                     total_files += 1
                 elif vnay == 0:
