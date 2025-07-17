@@ -152,36 +152,42 @@ async def usernn_count(client, message):
 
 
 
-@Client.on_message(filters.command("topartists"))
-async def top_artists_list(client, message):
+@Client.on_message(filters.command("allartists"))
+async def get_all_indian_artists(client, message):
     try:
-        query = "top hindi bollywood 2024"
-        market = "IN"
-        limit = 50
+        queries = [
+            "top hindi songs", "top bollywood", "top punjabi hits", "latest gujarati songs",
+            "indian classical", "indie india", "top tamil hits", "top telugu songs",
+            "top marathi tracks", "indian rap", "indian pop", "arijit singh", "shreya ghoshal",
+            "regional india", "indian devotional", "desi hip hop"
+        ]
 
-        results = sp.search(q=query, type='track', limit=limit, market=market)
+        artists_dict = {}
 
-        artists_set = set()
+        for query in queries:
+            results = sp.search(q=query, type='track', limit=50, market='IN')
+            for item in results['tracks']['items']:
+                for artist in item['artists']:
+                    artists_dict[artist['name']] = f"https://open.spotify.com/artist/{artist['id']}"
 
-        for item in results['tracks']['items']:
-            for artist in item['artists']:
-                artists_set.add(artist['name'])
+        # Sorted artist list
+        sorted_artists = sorted(artists_dict.items())
+        total_count = len(sorted_artists)
 
-        artists = sorted(list(artists_set))
-        total_count = len(artists)
+        # Build final text
+        text = f"🇮🇳 **All Indian Artist List (Auto Compiled)**\n🎧 **Total Unique Artists Found:** {total_count}\n\n"
+        for idx, (name, url) in enumerate(sorted_artists, 1):
+            text += f"{idx}. [{name}]({url})\n"
 
-        text = f"**🇮🇳 Estimated Top Artists from Search:** `{query}`\n"
-        text += f"🎧 **Total Unique Artists:** `{total_count}`\n\n"
+        # Save to .txt file (no markdown, just raw)
+        plain_text = "\n".join([f"{idx}. {name} - {url}" for idx, (name, url) in enumerate(sorted_artists, 1)])
+        with open("indian_artists_list.txt", "w", encoding="utf-8") as f:
+            f.write(plain_text)
 
-        for idx, name in enumerate(artists, 1):
-            text += f"{idx}. {name}\n"
-
-        if len(text) > 4096:
-            with open("top_artists_india.txt", "w", encoding="utf-8") as f:
-                f.write(text)
-            await message.reply_document("top_artists_india.txt", caption="📄 Artist list is too long, sent as file.")
-        else:
-            await message.reply(text)
+        await message.reply_document(
+            "indian_artists_list.txt",
+            caption=f"✅ Found `{total_count}` unique Indian artists via Spotify search."
+        )
 
     except Exception as e:
         await message.reply(f"❌ Error: `{e}`")
