@@ -82,3 +82,9 @@ async def dbcheck_handler(client: Client, message: Message):
 
     except Exception as e:
         await message.reply(f"❌ Error occurred: `{e}`")
+
+
+@app.on_message(filters.command("deleteall"))
+async def delete_all_media(client, message: Message):
+    result = await db.media_col.delete_many({})
+    await message.reply(f"🗑️ Deleted **{result.deleted_count}** entries from media DB.")
