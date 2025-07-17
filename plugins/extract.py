@@ -219,8 +219,10 @@ async def index_channel(client, message):
         return
 
     channel = message.command[1]
+    messages = []
     try:
-        messages = await client.get_messages(channel, limit=100)
+        async for msg in client.iter_history(channel, limit=100):
+            messages.append(msg)
     except Exception as e:
         await message.reply(f"Error fetching messages: {e}")
         return
@@ -229,8 +231,9 @@ async def index_channel(client, message):
         await message.reply("No messages found in the channel.")
         return
 
-    start_id = messages[-1].message_id  # oldest message in fetched list
-    end_id = messages[0].message_id     # newest message in fetched list
+    # iter_history returns messages newest to oldest, so:
+    start_id = messages[-1].message_id  # oldest
+    end_id = messages[0].message_id     # newest
     count = len(messages)
 
     reply_text = (
