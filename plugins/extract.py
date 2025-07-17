@@ -218,9 +218,22 @@ def extract_artist_id(artist_url):
     match = re.search(r"artist/([a-zA-Z0-9]+)", artist_url)
     return match.group(1) if match else None
 
+
+async def safe_spotify_call(func, *args, **kwargs):
+    while True:
+        try:
+            return func(*args, **kwargs)
+        except SpotifyException as e:
+            if e.http_status == 429:
+                retry_after = int(e.headers.get("Retry-After", 5))
+                logger.warning(f"🔁 429 Error. Retrying after {retry_after}s...")
+                await asyncio.sleep(retry_after + 1)
+            else:
+                raise
+               
 @Client.on_message(filters.command("artist") & filters.private & filters.reply)
 async def artist_bulk_tracks(client, message):
-    if not message.reply_to_message.document:
+    if not message.reply_to_message or not message.reply_to_message.document:
         await message.reply("❗ Please reply to a `.txt` file containing artist links.")
         return
 
@@ -232,6 +245,8 @@ async def artist_bulk_tracks(client, message):
 
     all_tracks = []
     artist_counter = 0
+    request_counter = 0
+    last_reset = time.time()
 
     for line in lines:
         match = re.search(r"spotify\.com/artist/([a-zA-Z0-9]+)", line)
@@ -242,30 +257,34 @@ async def artist_bulk_tracks(client, message):
         artist_counter += 1
 
         try:
-            # Fetch albums and singles
+            # Rate limiting check (100 requests/min)
+            if request_counter >= 100:
+                elapsed = time.time() - last_reset
+                if elapsed < 60:
+                    await asyncio.sleep(60 - elapsed)
+                request_counter = 0
+                last_reset = time.time()
+
+            logger.info(f"🎤 Fetching albums for Artist {artist_counter}: {artist_id}")
             album_ids = set()
-            single_ids = set()
 
-            results_albums = sp.artist_albums(artist_id, album_type='album', limit=50)
-            album_ids.update([album['id'] for album in results_albums['items']])
-            while results_albums['next']:
-                results_albums = sp.next(results_albums)
-                album_ids.update([album['id'] for album in results_albums['items']])
+            results = await safe_spotify_call(sp.artist_albums, artist_id, album_type='album,single', limit=50)
+            request_counter += 1
+            album_ids.update([album['id'] for album in results['items']])
 
-            results_singles = sp.artist_albums(artist_id, album_type='single', limit=50)
-            single_ids.update([single['id'] for single in results_singles['items']])
-            while results_singles['next']:
-                results_singles = sp.next(results_singles)
-                single_ids.update([single['id'] for single in results_singles['items']])
+            while results['next']:
+                results = await safe_spotify_call(sp.next, results)
+                request_counter += 1
+                album_ids.update([album['id'] for album in results['items']])
 
-            all_album_ids = list(album_ids.union(single_ids))
-            logger.info(f"Total releases: {len(all_album_ids)}")
+            logger.info(f"📀 Total releases: {len(album_ids)}")
 
-            for idx, release_id in enumerate(all_album_ids, 1):
+            for idx, release_id in enumerate(album_ids, 1):
                 try:
-                    tracks = sp.album_tracks(release_id)
+                    tracks = await safe_spotify_call(sp.album_tracks, release_id)
+                    request_counter += 1
                     all_tracks.extend([track['id'] for track in tracks['items']])
-                    await asyncio.sleep(0.2)
+                    await asyncio.sleep(0.2)  # minor delay between album track calls
 
                     if idx % 50 == 0:
                         await asyncio.sleep(3)
@@ -279,10 +298,11 @@ async def artist_bulk_tracks(client, message):
                         raise
 
         except Exception as e:
+            logger.warning(f"⚠️ Error with artist {artist_id}: {e}")
             await client.send_message(message.chat.id, f"⚠️ Error fetching `{artist_id}`: {e}")
             continue
 
-        # Send in parts every 5000
+        # Send in parts every 5000 tracks
         if len(all_tracks) >= 5000:
             batch = all_tracks[:5000]
             all_tracks = all_tracks[5000:]
@@ -297,7 +317,7 @@ async def artist_bulk_tracks(client, message):
             )
             await asyncio.sleep(3)
 
-    # Send remaining
+    # Send remaining tracks
     if all_tracks:
         part_file = f"tracks_final.txt"
         with open(part_file, "w", encoding="utf-8") as f:
@@ -310,7 +330,6 @@ async def artist_bulk_tracks(client, message):
         )
 
     await status_msg.edit("✅ Done! All artist track IDs fetched.")
-
 
 
 @Client.on_message(filters.command("checkall") & filters.private & filters.reply)
