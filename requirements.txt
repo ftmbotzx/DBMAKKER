@@ -13,3 +13,7 @@ yt-dlp>=2025.02.19
 ffmpeg-python
 ffmpeg
 motor
+pymongo[srv]==3.12.3
+motor==2.5.1
+marshmallow==3.14.1
+umongo==3.0.1
