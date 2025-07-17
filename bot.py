@@ -66,46 +66,31 @@ class Bot(Client):
         limit: int = 100,
         offset_id: int = 0
     ) -> AsyncGenerator[Message, None]:
-        """
-        Iterate over messages in a chat starting from offset_id going backwards.
-
-        Args:
-            chat_id: Target chat ID or username.
-            limit: Maximum number of messages to fetch.
-            offset_id: Message ID to start from (fetch messages older than this).
-
-        Yields:
-            Message objects one by one.
-        """
         total = 0
-        last_id = offset_id
+        current_id = offset_id if offset_id > 0 else (await self.get_history(chat_id, limit=1))[0].message_id
 
-        while True:
-            # Telegram API max batch size is 100 messages per get_messages call
+        while total < limit:
             batch_limit = min(100, limit - total)
-            if batch_limit <= 0:
+
+            # Generate list of message IDs decreasing from current_id backwards
+            message_ids = list(range(current_id, current_id - batch_limit, -1))
+            if not message_ids:
                 break
-            
-            messages = await self.get_messages(
-                chat_id,
-                limit=batch_limit,
-                offset_id=last_id
-            )
-            
+
+            messages = await self.get_messages(chat_id, message_ids)
+
             if not messages:
                 break
-            
+
             for message in messages:
                 yield message
                 total += 1
-                last_id = message.id
+                current_id = message.message_id - 1
                 if total >= limit:
                     break
-            
-            if len(messages) < batch_limit:
-                # No more messages available
-                break
 
+            if len(messages) < batch_limit:
+                break
                 
 
     async def stop(self, *args):
