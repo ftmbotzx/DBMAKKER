@@ -96,7 +96,8 @@ class Database:
         try:
             file_id, file_ref = unpack_new_file_id(media.file_id)
             file_name = re.sub(r"[_\-.+]", " ", str(media.file_name or "Unknown"))
-            caption = message.caption or ""
+            caption = message.caption.html if message.caption and message.caption.html else message.caption.text if message.caption else None
+
             track_id = extract_track_id(caption)
 
             file_data = {
