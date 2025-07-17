@@ -155,8 +155,13 @@ async def usernn_count(client, message):
 @Client.on_message(filters.command("topartists"))
 async def top_artists_list(client, message):
     try:
-        # Spotify's official "Top 50 - India" playlist ID
-        playlist_id = "37i9dQZEVXbLZ52XmnySJg"
+        # Dynamically get the "Toplists" category for India
+        category = sp.category_playlists(category_id='toplists', country='IN')
+        playlist = category['playlists']['items'][0]  # Get 1st playlist (usually "Top 50 India")
+        playlist_id = playlist['id']
+        playlist_name = playlist['name']
+
+        # Fetch tracks from that playlist
         results = sp.playlist_tracks(playlist_id)
 
         artists_set = set()
@@ -169,7 +174,7 @@ async def top_artists_list(client, message):
         artists = sorted(list(artists_set))
         total_count = len(artists)
 
-        text = f"**🇮🇳 Top Artists in India (via Top 50 Chart)**\n"
+        text = f"**🇮🇳 Top Artists from Playlist:** `{playlist_name}`\n"
         text += f"🎧 **Total Unique Artists:** `{total_count}`\n\n"
 
         for idx, name in enumerate(artists, 1):
