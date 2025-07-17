@@ -3,6 +3,9 @@ import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 import re
 
+from pyrogram.types import Message
+
+
 client_id = "e54b28b15f574338a709fdbde414b428"
 client_secret = "7dead9452e6546fabdc9ad09ed00f172"
 
@@ -158,39 +161,35 @@ async def search_track_id_from_text(query):
         return items[0]["id"], items[0]["duration_ms"]
     return None, None
 
-@Client.on_message(filters.command("id") & filters.reply)
-async def get_spotify_track_id(client, message):
-    if not message.reply_to_message.audio:
-        await message.reply("❗Please reply to a music/audio file.")
+def extract_track_id_from_caption(caption):
+    match = re.search(r"track/([a-zA-Z0-9]+)", caption)
+    if match:
+        return match.group(1)
+    return None
+
+@app.on_message(filters.command("fix") & filters.reply)
+async def fix_audio_duration(client: Client, message: Message):
+    reply = message.reply_to_message
+    if not reply or not reply.audio:
+        await message.reply("❗ Please reply to a Spotify song audio.")
         return
 
-    audio = message.reply_to_message.audio
-    duration = audio.duration or 0
-
-    if duration > 1:
-        await message.reply("⛔ Skipping. Duration is already valid.")
-        return
-
-    caption = message.reply_to_message.caption or ""
-    track_id = extract_track_id_from_url(caption)
-
+    caption = reply.caption or ""
+    track_id = extract_track_id_from_caption(caption)
     if not track_id:
-        # Try searching from "Artist - Title"
-        search_text = f"{audio.performer or ''} {audio.title or ''}".strip()
-        track_id, duration_ms = await search_track_id_from_text(search_text)
-        if not track_id:
-            await message.reply("❌ Could not find track on Spotify.")
-            return
-    else:
+        await message.reply("⚠️ Couldn't find Spotify track ID in caption.")
+        return
+
+    try:
         track = sp.track(track_id)
         duration_ms = track["duration_ms"]
+        duration_sec = int(duration_ms / 1000)
 
-    duration_sec = duration_ms // 1000
-    minutes = duration_sec // 60
-    seconds = duration_sec % 60
+        await message.reply_audio(
+            audio=reply.audio.file_id,
+            duration=duration_sec,
+            caption=f"✅ Fixed duration from Spotify\n🎵 {track['name']} - {track['artists'][0]['name']}\n🔗 https://open.spotify.com/track/{track_id}"
+        )
 
-    reply = f"✅ **Spotify Track Info**\n"
-    reply += f"🎵 **Track ID:** `{track_id}`\n"
-    reply += f"⏱ **Duration:** `{minutes}:{seconds:02d}`"
-
-    await message.reply(reply)
+    except Exception as e:
+        await message.reply(f"❌ Error: `{e}`")
