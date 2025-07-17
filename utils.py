@@ -11,6 +11,20 @@ import random
 
 logger = logging.getLogger(__name__)
 
+class temp(object):
+    BANNED_USERS = []
+    BANNED_CHATS = []
+    ME = None
+    CURRENT=int(os.environ.get("SKIP", 2))
+    CANCEL = False
+    MELCOW = {}
+    U_NAME = None
+    B_NAME = None
+    SETTINGS = {}
+    VERIFY = {}
+    MOVIES = {}
+    
+
 def safe_filename(name: str) -> str:
     """Remove unsafe filesystem characters from a filename."""
     return re.sub(r'[\\/*?:"<>|]', '_', name)
