@@ -147,53 +147,50 @@ async def usernn_count(client, message):
         await message.reply(f"❌ Error: `{e}`")
 
 
+def extract_track_id_from_url(text):
+    match = re.search(r"track/([a-zA-Z0-9]+)", text)
+    return match.group(1) if match else None
 
-@Client.on_message(filters.command("getid") & filters.reply)
-async def get_spotify_id(client, message):
-    reply = message.reply_to_message
+async def search_track_id_from_text(query):
+    results = sp.search(q=query, limit=1, type='track')
+    items = results.get("tracks", {}).get("items", [])
+    if items:
+        return items[0]["id"], items[0]["duration_ms"]
+    return None, None
 
-    if not reply.audio and not reply.voice:
-        await message.reply("❗ Please reply to a music/audio message.")
+@Client.on_message(filters.command("id") & filters.reply)
+async def get_spotify_track_id(client, message):
+    if not message.reply_to_message.audio:
+        await message.reply("❗Please reply to a music/audio file.")
         return
 
-    caption = reply.caption or ""
-    track_id = None
+    audio = message.reply_to_message.audio
+    duration = audio.duration or 0
 
-    # Try extracting Spotify link from caption
-    link_match = re.search(r"https?://open\.spotify\.com/track/([a-zA-Z0-9]+)", caption)
-    if link_match:
-        track_id = link_match.group(1)
-        await message.reply(f"✅ Spotify Track ID: `{track_id}`")
+    if duration > 1:
+        await message.reply("⛔ Skipping. Duration is already valid.")
         return
 
-    # If no link, try to extract title and artist from caption or file metadata
-    title = reply.audio.title if reply.audio else None
-    performer = reply.audio.performer if reply.audio else None
+    caption = message.reply_to_message.caption or ""
+    track_id = extract_track_id_from_url(caption)
 
-    # If title/performer is in caption manually
-    if not title or not performer:
-        parts = caption.strip().split("-")
-        if len(parts) >= 2:
-            performer = parts[0].strip()
-            title = parts[1].strip()
-
-    if not title or not performer:
-        await message.reply("⚠️ Couldn't extract song title or artist.")
-        return
-
-    # Now search on Spotify
-    query = f"{performer} {title}"
-    try:
-        results = sp.search(q=query, type="track", limit=1)
-        items = results['tracks']['items']
-        if not items:
-            await message.reply("❌ No matching track found on Spotify.")
+    if not track_id:
+        # Try searching from "Artist - Title"
+        search_text = f"{audio.performer or ''} {audio.title or ''}".strip()
+        track_id, duration_ms = await search_track_id_from_text(search_text)
+        if not track_id:
+            await message.reply("❌ Could not find track on Spotify.")
             return
+    else:
+        track = sp.track(track_id)
+        duration_ms = track["duration_ms"]
 
-        track = items[0]
-        track_id = track['id']
-        track_url = track['external_urls']['spotify']
-        await message.reply(f"✅ Track ID: `{track_id}`\n🔗 [Open in Spotify]({track_url})", disable_web_page_preview=True)
-    except Exception as e:
-        await message.reply(f"❌ Error: `{e}`")
+    duration_sec = duration_ms // 1000
+    minutes = duration_sec // 60
+    seconds = duration_sec % 60
 
+    reply = f"✅ **Spotify Track Info**\n"
+    reply += f"🎵 **Track ID:** `{track_id}`\n"
+    reply += f"⏱ **Duration:** `{minutes}:{seconds:02d}`"
+
+    await message.reply(reply)
