@@ -174,7 +174,7 @@ async def fix_audio_duration(client, message):
         await message.reply("❗ Please reply to a Spotify song audio.")
         return
 
-    caption = reply.caption or ""
+    caption = message.reply_to_message.caption or ""
     track_id = extract_track_id_from_url(caption)
     if not track_id:
         await message.reply("⚠️ Couldn't find Spotify track ID in caption.")
