@@ -167,7 +167,7 @@ def extract_track_id_from_caption(caption):
         return match.group(1)
     return None
 
-@app.on_message(filters.command("fix") & filters.reply)
+@Client.on_message(filters.command("fix") & filters.reply)
 async def fix_audio_duration(client: Client, message: Message):
     reply = message.reply_to_message
     if not reply or not reply.audio:
