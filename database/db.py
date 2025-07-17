@@ -8,6 +8,12 @@ from umongo import Instance, Document, fields
 from motor.motor_asyncio import AsyncIOMotorClient
 from marshmallow.exceptions import ValidationError
 
+import logging
+from struct import pack
+import re
+import asyncio
+import base64
+import pymongo
 
 def encode_file_id(s: bytes) -> str:
     r = b""
