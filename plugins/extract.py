@@ -168,10 +168,17 @@ def extract_track_id_from_caption(caption):
     return None
 
 @Client.on_message(filters.command("fix") & filters.reply)
-async def fix_audio_duration(client, message):
+async def get_spotify_track_id(client, message):
     reply = message.reply_to_message
-    if not reply or not reply.audio:
-        await message.reply("❗ Please reply to a Spotify song audio.")
+    if not message.reply_to_message.audio:
+        await message.reply("❗Please reply to a music/audio file.")
+        return
+
+    audio = message.reply_to_message.audio
+    duration = audio.duration or 0
+
+    if duration > 1:
+        await message.reply("⛔ Skipping. Duration is already valid.")
         return
 
     caption = message.reply_to_message.caption or ""
