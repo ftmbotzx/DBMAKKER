@@ -163,6 +163,7 @@ async def search_track_id_from_text(query):
 
 @Client.on_message(filters.command("id") & filters.reply)
 async def get_spotify_track_id(client, message):
+    reply = message.reply_to_message
     if not message.reply_to_message.audio:
         await message.reply("❗Please reply to a music/audio file.")
         return
@@ -176,6 +177,7 @@ async def get_spotify_track_id(client, message):
 
     caption = message.reply_to_message.caption or ""
     track_id = extract_track_id_from_url(caption)
+    file_id = reply.audio.file_id
 
     if not track_id:
         # Try searching from "Artist - Title"
@@ -193,7 +195,7 @@ async def get_spotify_track_id(client, message):
     seconds = duration_sec % 60
 
     reply = f"✅ **Spotify Track Info**\n"
-    reply += f"🎵 **Track ID:** `{track_id}`\n"
+    reply += f"🎵 **Track ID:** `{track_id} {file_id}`\n"
     reply += f"⏱ **Duration:** `{minutes}:{seconds:02d}`"
 
     await message.reply(reply)
