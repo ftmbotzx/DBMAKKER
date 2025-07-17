@@ -10,7 +10,7 @@ PORT = int(os.getenv("PORT", "8080"))
 FORCE_CHANNEL = int(os.getenv("FORCE_CHANNEL", "-1002884716564"))
 MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://Ansh089:Ansh089@cluster0.y8tpouc.mongodb.net/?retryWrites=true&w=majority")
 MONGO_NAME = os.getenv("MONGO_NAME", "SpotifyDL")
-COLLECTION_NAME = os.getenv("COLLECTION_NAME", "")
+COLLECTION_NAME = os.getenv("COLLECTION_NAME", "media")
 ADMINS = [5660839376, 6167872503, 5961011848, 6538627123]
 DAILY_LIMITS = 20
 MAINTENANCE_MODE = False  # Change to False to disable maintenance mode
