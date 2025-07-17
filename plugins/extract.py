@@ -150,15 +150,10 @@ async def usernn_count(client, message):
         await message.reply(f"❌ Error: `{e}`")
 
 
-import re
-
 def extract_track_id_from_url(text):
-    # Match URLs like https://open.spotify.com/track/7qiZfU4dY1lWllzX7mPBI3
-    match = re.search(r"(?:https?://open\.spotify\.com/track/|spotify:track:)([a-zA-Z0-9]+)", text)
-    if match:
-        return match.group(1)
-    return None
-    
+    match = re.search(r"track/([a-zA-Z0-9]+)", text)
+    return match.group(1) if match else None
+
 async def search_track_id_from_text(query):
     results = sp.search(q=query, limit=1, type='track')
     items = results.get("tracks", {}).get("items", [])
@@ -166,15 +161,8 @@ async def search_track_id_from_text(query):
         return items[0]["id"], items[0]["duration_ms"]
     return None, None
 
-def extract_track_id_from_caption(caption):
-    match = re.search(r"track/([a-zA-Z0-9]+)", caption)
-    if match:
-        return match.group(1)
-    return None
-
-@Client.on_message(filters.command("fix") & filters.reply)
+@Client.on_message(filters.command("id") & filters.reply)
 async def get_spotify_track_id(client, message):
-    reply = message.reply_to_message
     if not message.reply_to_message.audio:
         await message.reply("❗Please reply to a music/audio file.")
         return
@@ -188,20 +176,24 @@ async def get_spotify_track_id(client, message):
 
     caption = message.reply_to_message.caption or ""
     track_id = extract_track_id_from_url(caption)
-    if not track_id:
-        await message.reply("⚠️ Couldn't find Spotify track ID in caption.")
-        return
 
-    try:
+    if not track_id:
+        # Try searching from "Artist - Title"
+        search_text = f"{audio.performer or ''} {audio.title or ''}".strip()
+        track_id, duration_ms = await search_track_id_from_text(search_text)
+        if not track_id:
+            await message.reply("❌ Could not find track on Spotify.")
+            return
+    else:
         track = sp.track(track_id)
         duration_ms = track["duration_ms"]
-        duration_sec = int(duration_ms / 1000)
 
-        await message.reply_audio(
-            audio=reply.audio.file_id,
-            duration=duration_sec,
-            caption=f"✅ Fixed duration from Spotify\n🎵 {track['name']} - {track['artists'][0]['name']}\n🔗 https://open.spotify.com/track/{track_id}"
-        )
+    duration_sec = duration_ms // 1000
+    minutes = duration_sec // 60
+    seconds = duration_sec % 60
 
-    except Exception as e:
-        await message.reply(f"❌ Error: `{e}`")
+    reply = f"✅ **Spotify Track Info**\n"
+    reply += f"🎵 **Track ID:** `{track_id}`\n"
+    reply += f"⏱ **Duration:** `{minutes}:{seconds:02d}`"
+
+    await message.reply(reply)
