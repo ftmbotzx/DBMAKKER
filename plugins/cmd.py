@@ -84,7 +84,7 @@ async def dbcheck_handler(client: Client, message: Message):
         await message.reply(f"❌ Error occurred: `{e}`")
 
 
-@app.on_message(filters.command("deleteall"))
-async def delete_all_media(client, message: Message):
+@Client.on_message(filters.command("deleteall"))
+async def delete_all_media(client, message):
     result = await db.media_col.delete_many({})
     await message.reply(f"🗑️ Deleted **{result.deleted_count}** entries from media DB.")
