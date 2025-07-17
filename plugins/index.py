@@ -5,7 +5,7 @@ from pyrogram.errors import FloodWait
 from pyrogram.errors.exceptions.bad_request_400 import ChannelInvalid, ChatAdminRequired, UsernameInvalid, UsernameNotModified
 from info import ADMINS
 from info import LOG_CHANNEL
-from database.ia_filterdb import save_file
+from database.db import db
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from utils import temp
 import re
@@ -191,7 +191,7 @@ async def index_files_to_db(lst_msg_id, chat, msg, bot):
                     continue
                 media.file_type = message.media.value
                 media.caption = message.caption
-                aynav, vnay = await save_file(media)
+                aynav, vnay = await db.save_file(media)
                 if aynav:
                     total_files += 1
                 elif vnay == 0:
