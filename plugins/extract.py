@@ -207,6 +207,6 @@ async def get_spotify_track_id(client, message):
         caption=(
             f"✅ Fixed duration from Spotify\n"
             f"🎵 {track['name']} - {track['artists'][0]['name']}\n"
-            f"🔗 https://open.spotify.com/track/{track_id}"
+            f"🔗 https://open.spotify.com/track/{track_id}///  {duration_sec}  "
         )
     )
