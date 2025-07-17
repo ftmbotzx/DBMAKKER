@@ -168,7 +168,7 @@ def extract_track_id_from_caption(caption):
     return None
 
 @Client.on_message(filters.command("fix") & filters.reply)
-async def fix_audio_duration(client: Client, message: Message):
+async def fix_audio_duration(client, message):
     reply = message.reply_to_message
     if not reply or not reply.audio:
         await message.reply("❗ Please reply to a Spotify song audio.")
