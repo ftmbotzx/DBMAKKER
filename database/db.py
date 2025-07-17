@@ -51,20 +51,25 @@ def unpack_new_file_id(new_file_id):
 
 
 def extract_track_id(caption: str) -> str | None:
-    import re
+    if not caption:
+        logger.info("No caption provided.")
+        return None
 
-    # Try extracting from Spotify URL
-    match = re.search(r"(https?://open\.spotify\.com/track/([a-zA-Z0-9]+))", caption)
+    match = re.search(r"https?://open\.spotify\.com/track/([a-zA-Z0-9]+)", caption)
     if match:
-        return match.group(2)
+        track_id = match.group(1)
+        logger.info(f"Extracted track ID from URL: {track_id} in caption: {caption}///{match}")
+        return track_id
 
-    # Fallback: search for track ID pattern
     match = re.search(r"\b([a-zA-Z0-9]{22})\b", caption)
     if match:
-        return match.group(1)
+        track_id = match.group(1)
+        logger.info(f"Extracted track ID (22 chars) from caption: {track_id}/////{match}")
+        return track_id
 
+    logger.info(f"No track ID found in caption: {caption}//// {match}")
     return None
-
+    
 # ---------------------- Database Handler ---------------------- #
 
 class Database:
@@ -103,7 +108,7 @@ class Database:
                 "mime_type": getattr(media, "mime_type", None),
                 "caption": media.caption.html if getattr(media, "caption", None) else None,
                 "chat_id": str(message.chat.id),
-                "msg_id": str(message.id),
+                "msg_id": message.id,
                 "track_id": track_id
             }
 
