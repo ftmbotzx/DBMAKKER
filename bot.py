@@ -17,6 +17,8 @@ from pyrogram.raw.all import layer
 from plugins import web_server
 from info import SESSION, API_ID, API_HASH, BOT_TOKEN, LOG_CHANNEL, PORT, USER_SESSION, ADMINS
 
+from typing import AsyncGenerator, Union
+from pyrogram.types import Message
 
 # Logging setup
 logging.basicConfig(level=logging.INFO)
@@ -57,44 +59,53 @@ class Bot(Client):
         await web.TCPSite(app, "0.0.0.0", PORT).start()
         logging.info(f"🌐 Web Server Running on PORT {PORT}")
         
+
     async def iter_messages(
         self,
         chat_id: Union[int, str],
-        limit: int,
-        offset: int = 0,
-    ) -> Optional[AsyncGenerator["types.Message", None]]:
-        """Iterate through a chat sequentially.
-        This convenience method does the same as repeatedly calling :meth:`~pyrogram.Client.get_messages` in a loop, thus saving
-        you from the hassle of setting up boilerplate code. It is useful for getting the whole chat messages with a
-        single call.
-        Parameters:
-            chat_id (``int`` | ``str``):
-                Unique identifier (int) or username (str) of the target chat.
-                For your personal cloud (Saved Messages) you can simply use "me" or "self".
-                For a contact that exists in your Telegram address book you can use his phone number (str).
-                
-            limit (``int``):
-                Identifier of the last message to be returned.
-                
-            offset (``int``, *optional*):
-                Identifier of the first message to be returned.
-                Defaults to 0.
-        Returns:
-            ``Generator``: A generator yielding :obj:`~pyrogram.types.Message` objects.
-        Example:
-            .. code-block:: python
-                for message in app.iter_messages("pyrogram", 1, 15000):
-                    print(message.text)
+        limit: int = 100,
+        offset_id: int = 0
+    ) -> AsyncGenerator[Message, None]:
         """
-        current = offset
+        Iterate over messages in a chat starting from offset_id going backwards.
+
+        Args:
+            chat_id: Target chat ID or username.
+            limit: Maximum number of messages to fetch.
+            offset_id: Message ID to start from (fetch messages older than this).
+
+        Yields:
+            Message objects one by one.
+        """
+        total = 0
+        last_id = offset_id
+
         while True:
-            new_diff = min(200, limit - current)
-            if new_diff <= 0:
-                return
-            messages = await self.get_messages(chat_id, list(range(current, current+new_diff+1)))
+            # Telegram API max batch size is 100 messages per get_messages call
+            batch_limit = min(100, limit - total)
+            if batch_limit <= 0:
+                break
+            
+            messages = await self.get_messages(
+                chat_id,
+                limit=batch_limit,
+                offset_id=last_id
+            )
+            
+            if not messages:
+                break
+            
             for message in messages:
                 yield message
-                current += 1
+                total += 1
+                last_id = message.id
+                if total >= limit:
+                    break
+            
+            if len(messages) < batch_limit:
+                # No more messages available
+                break
+
                 
 
     async def stop(self, *args):
