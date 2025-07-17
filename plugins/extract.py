@@ -199,3 +199,8 @@ async def get_spotify_track_id(client, message):
     reply += f"⏱ **Duration:** `{minutes}:{seconds:02d}`"
 
     await message.reply(reply)
+    await message.reply_audio(
+            audio=reply.audio.file_id,
+            duration=duration_sec,
+            caption=f"✅ Fixed duration from Spotify\n🎵 {track['name']} - {track['artists'][0]['name']}\n🔗 https://open.spotify.com/track/{track_id}"
+        )
