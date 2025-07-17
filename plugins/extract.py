@@ -150,113 +150,37 @@ async def usernn_count(client, message):
         await message.reply(f"❌ Error: `{e}`")
 
 
-def extract_track_id_from_url(text):
-    match = re.search(r"track/([a-zA-Z0-9]+)", text)
-    return match.group(1) if match else None
-
-async def search_track_id_from_text(query):
-    results = sp.search(q=query, limit=1, type='track')
-    items = results.get("tracks", {}).get("items", [])
-    if items:
-        return items[0]["id"], items[0]["duration_ms"]
-    return None, None
-
-@Client.on_message(filters.command("id") & filters.reply)
-async def get_spotify_track_id(client, message):
-    reply = message.reply_to_message
-    if not reply.audio:
-        await message.reply("❗Please reply to a music/audio file.")
-        return
-
-    audio = reply.audio
-    duration = audio.duration or 0
-
-    if duration > 1:
-        await message.reply("⛔ Skipping. Duration is already valid.")
-        return
-
-    caption = reply.caption or ""
-    track_id = extract_track_id_from_url(caption)
-    file_id = reply.audio.file_id
-
-    if not track_id:
-        search_text = f"{audio.performer or ''} {audio.title or ''}".strip()
-        track_id, duration_ms = await search_track_id_from_text(search_text)
-        if not track_id:
-            await message.reply("❌ Could not find track on Spotify.")
-            return
-        track = sp.track(track_id)
-    else:
-        track = sp.track(track_id)
-        duration_ms = track["duration_ms"]
-
-    duration_sec = int(duration_ms / 1000)
-    minutes = duration_sec // 60
-    seconds = duration_sec % 60
-
-    response_text = (
-        f"✅ **Spotify Track Info**\n"
-        f"🎵 **Track ID:** `{track_id} {file_id}`\n"
-        f"⏱ **Duration:** `{minutes}:{seconds:02d}`"
-    )
-
-    await message.reply(response_text)
-    await message.reply_audio(
-        audio=file_id,
-        duration=duration_sec,
-        caption=(
-            f"✅ Fixed duration from Spotify\n"
-            f"🎵 {track['name']} - {track['artists'][0]['name']}\n"
-            f"🔗 https://open.spotify.com/track/{track_id}///  {duration_sec}  "
-        )
-    )
 
 
-import re
-
-def parse_tg_link(link: str):
-    # Supports links like https://t.me/channelusername/123
-    match = re.search(r"t.me/([a-zA-Z0-9_]+)/(\d+)", link)
-    if match:
-        return match.group(1), int(match.group(2))
-    return None, None
-    
-
-@Client.on_message(filters.command("index") & filters.private)
-async def index_command(client, message):
-    if len(message.command) < 2:
-        return await message.reply("Send message link to start indexing.\nExample:\n/index https://t.me/channelusername/123")
-
-    link = message.command[1]
-    channel, start_msg_id = parse_tg_link(link)
-    if not channel or not start_msg_id:
-        return await message.reply("Invalid Telegram message link.")
-
-    await message.reply(f"Starting indexing from {channel} message {start_msg_id}...")
-
-    count = 0
+@Client.on_message(filters.command("topartists"))
+async def top_artists_list(client, message):
     try:
-        async for msg in client.iter_history(channel, offset_id=start_msg_id - 1, limit=100):
-            # Filter media
-            if msg.media and msg.media.value in ['audio', 'video', 'document']:
-                media = getattr(msg, msg.media.value)
-                data = {
-                    "chat": channel,
-                    "message_id": msg.message_id,
-                    "file_id": media.file_id,
-                    "file_type": msg.media.value,
-                    "caption": msg.caption,
-                    "date": msg.date.isoformat()
-                }
-               
-                count += 1
-            if count % 20 == 0:
-                await message.reply(f"Indexed {count} files so far...")
-    except FloodWait as e:
-        await message.reply(f"Flood wait! Sleeping for {e.x} seconds...")
-        await asyncio.sleep(e.x)
-    except Exception as e:
-        await message.reply(f"Error during indexing: {e}")
-        return
+        # Spotify's official "Top 50 - India" playlist ID
+        playlist_id = "37i9dQZEVXbLZ52XmnySJg"
+        results = sp.playlist_tracks(playlist_id)
 
-    await message.reply(f"Indexing completed. Total files indexed: {count}")
+        artists_set = set()
+
+        for item in results['items']:
+            track = item['track']
+            for artist in track['artists']:
+                artists_set.add(artist['name'])
+
+        artists = sorted(list(artists_set))
+        total_count = len(artists)
+
+        text = f"**🇮🇳 Top Artists in India (via Top 50 Chart)**\n"
+        text += f"🎧 **Total Unique Artists:** `{total_count}`\n\n"
+
+        for idx, name in enumerate(artists, 1):
+            text += f"{idx}. {name}\n"
+
+        if len(text) > 4096:
+            with open("top_artists_india.txt", "w", encoding="utf-8") as f:
+                f.write(text)
+            await message.reply_document("top_artists_india.txt", caption="📄 Artist list is too long, sent as file.")
+        else:
+            await message.reply(text)
+
+    except Exception as e:
+        await message.reply(f"❌ Error: `{e}`")
