@@ -136,6 +136,17 @@ async def set_skip_number(bot, message):
 
 
 # ... (imports and config remain same)
+from pyrogram import enums
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
+SUPPORTED_MEDIA_TYPES = [
+    enums.MessageMediaType.AUDIO,
+    enums.MessageMediaType.VIDEO,
+    enums.MessageMediaType.DOCUMENT,
+    enums.MessageMediaType.VOICE,
+    enums.MessageMediaType.VIDEO_NOTE,
+]
+
 async def index_files_to_db(lst_msg_id, chat, msg, bot):
     total_files = 0
     duplicate = 0
@@ -143,36 +154,38 @@ async def index_files_to_db(lst_msg_id, chat, msg, bot):
     deleted = 0
     no_media = 0
     unsupported = 0
+
     async with lock:
         try:
             temp.CANCEL = False
             current = 0
+
             async for message in bot.iter_messages(chat, offset_id=lst_msg_id, limit=10000):
                 if temp.CANCEL:
                     await msg.edit(
-                        f"Successfully Cancelled!!\n\n"
-                        f"Saved <code>{total_files}</code> files to dataBase!\n"
-                        f"Duplicate Files Skipped: <code>{duplicate}</code>\n"
-                        f"Deleted Messages Skipped: <code>{deleted}</code>\n"
-                        f"Non-Audio Messages Skipped: <code>{no_media + unsupported}</code> "
-                        f"(Unsupported Media - `{unsupported}`)\n"
-                        f"Errors Occurred: <code>{errors}</code>"
+                        f"❌ Cancelled!\n\n"
+                        f"✅ Saved: <code>{total_files}</code>\n"
+                        f"⏹️ Duplicate: <code>{duplicate}</code>\n"
+                        f"🗑️ Deleted: <code>{deleted}</code>\n"
+                        f"🚫 Unsupported/No Media: <code>{no_media + unsupported}</code> "
+                        f"(Unsupported: `{unsupported}`)\n"
+                        f"⚠️ Errors: <code>{errors}</code>"
                     )
                     break
 
                 current += 1
                 if current % 20 == 0:
-                    can = [[InlineKeyboardButton('Cancel', callback_data='index_cancel')]]
-                    reply = InlineKeyboardMarkup(can)
                     await msg.edit_text(
-                        text=f"Total messages fetched: <code>{current}</code>\n"
-                             f"Total audio files saved: <code>{total_files}</code>\n"
-                             f"Duplicate Files Skipped: <code>{duplicate}</code>\n"
-                             f"Deleted Messages Skipped: <code>{deleted}</code>\n"
-                             f"Non-Audio Messages Skipped: <code>{no_media + unsupported}</code> "
-                             f"(Unsupported Media - `{unsupported}`)\n"
-                             f"Errors Occurred: <code>{errors}</code>",
-                        reply_markup=reply
+                        text=(
+                            f"🔄 Processed: <code>{current}</code>\n"
+                            f"✅ Saved: <code>{total_files}</code>\n"
+                            f"⏹️ Duplicate: <code>{duplicate}</code>\n"
+                            f"🗑️ Deleted: <code>{deleted}</code>\n"
+                            f"🚫 Unsupported/No Media: <code>{no_media + unsupported}</code> "
+                            f"(Unsupported: `{unsupported}`)\n"
+                            f"⚠️ Errors: <code>{errors}</code>"
+                        ),
+                        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Cancel', callback_data='index_cancel')]])
                     )
 
                 if message.empty:
@@ -181,7 +194,7 @@ async def index_files_to_db(lst_msg_id, chat, msg, bot):
                 elif not message.media:
                     no_media += 1
                     continue
-                elif message.media != enums.MessageMediaType.AUDIO:
+                elif message.media not in SUPPORTED_MEDIA_TYPES:
                     unsupported += 1
                     continue
 
@@ -192,22 +205,30 @@ async def index_files_to_db(lst_msg_id, chat, msg, bot):
 
                 media.file_type = message.media.value
                 media.caption = message.caption
-                aynav, vnay = await db.save_file(bot, message.audio, message)
-                if aynav:
-                    total_files += 1
-                elif vnay == 0:
-                    duplicate += 1
-                elif vnay == 2:
+
+                try:
+                    saved, code = await db.save_file(bot, media, message)
+                    if saved:
+                        total_files += 1
+                    elif code == 0:
+                        duplicate += 1
+                    elif code == 2:
+                        errors += 1
+                except Exception as e:
+                    logger.exception("Failed during save_file call")
                     errors += 1
+
         except Exception as e:
             logger.exception(e)
-            await msg.edit(f'Error: {e}')
+            await msg.edit(f'❌ Error occurred:\n<code>{e}</code>')
         else:
             await msg.edit(
-                f'Successfully saved <code>{total_files}</code> audio files to dataBase!\n'
-                f'Duplicate Files Skipped: <code>{duplicate}</code>\n'
-                f'Deleted Messages Skipped: <code>{deleted}</code>\n'
-                f'Non-Audio Messages Skipped: <code>{no_media + unsupported}</code> '
-                f'(Unsupported Media - `{unsupported}`)\n'
-                f'Errors Occurred: <code>{errors}</code>'
+                f"✅ Indexing Completed\n\n"
+                f"✔️ Saved: <code>{total_files}</code>\n"
+                f"⏹️ Duplicate: <code>{duplicate}</code>\n"
+                f"🗑️ Deleted: <code>{deleted}</code>\n"
+                f"🚫 Unsupported/No Media: <code>{no_media + unsupported}</code> "
+                f"(Unsupported: `{unsupported}`)\n"
+                f"⚠️ Errors: <code>{errors}</code>"
             )
+
