@@ -67,7 +67,7 @@ class Bot(Client):
         offset_id: int = 0
     ) -> AsyncGenerator[Message, None]:
         total = 0
-        current_id = offset_id if offset_id > 0 else (await self.get_history(chat_id, limit=1))[0].message_id
+        current_id = offset_id if offset_id > 0 else (await self.get_history(chat_id, limit=1))[0].id
 
         while total < limit:
             batch_limit = min(100, limit - total)
@@ -85,7 +85,7 @@ class Bot(Client):
             for message in messages:
                 yield message
                 total += 1
-                current_id = message.message_id - 1
+                current_id = message.id - 1
                 if total >= limit:
                     break
 
