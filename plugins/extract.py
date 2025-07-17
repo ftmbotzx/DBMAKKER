@@ -5,12 +5,26 @@ import re
 
 from pyrogram.types import Message
 from pyrogram.errors import FloodWait
+import logging
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
+
+
 
 client_id = "e54b28b15f574338a709fdbde414b428"
 client_secret = "7dead9452e6546fabdc9ad09ed00f172"
 
 auth_manager = SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
 sp = spotipy.Spotify(auth_manager=auth_manager)
+
+
+
+
 
 def extract_user_id(url):
     match = re.search(r"spotify\.com/user/([a-zA-Z0-9]+)", url)
@@ -191,3 +205,109 @@ async def get_all_indian_artists(client, message):
 
     except Exception as e:
         await message.reply(f"❌ Error: `{e}`")
+
+
+import asyncio
+import re
+from pyrogram import Client, filters
+from spotipy import SpotifyException
+
+
+
+def extract_artist_id(artist_url):
+    match = re.search(r"artist/([a-zA-Z0-9]+)", artist_url)
+    return match.group(1) if match else None
+
+@Client.on_message(filters.command("artist") & filters.private & filters.reply)
+async def artist_bulk_tracks(client, message):
+    if not message.reply_to_message.document:
+        await message.reply("❗ Please reply to a `.txt` file containing artist links.")
+        return
+
+    status_msg = await message.reply("📥 Downloading file...")
+
+    file_path = await message.reply_to_message.download()
+    with open(file_path, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+
+    all_tracks = []
+    artist_counter = 0
+
+    for line in lines:
+        match = re.search(r"spotify\.com/artist/([a-zA-Z0-9]+)", line)
+        if not match:
+            continue
+
+        artist_id = match.group(1)
+        artist_counter += 1
+
+        try:
+            # Fetch albums and singles
+            album_ids = set()
+            single_ids = set()
+
+            results_albums = sp.artist_albums(artist_id, album_type='album', limit=50)
+            album_ids.update([album['id'] for album in results_albums['items']])
+            while results_albums['next']:
+                results_albums = sp.next(results_albums)
+                album_ids.update([album['id'] for album in results_albums['items']])
+
+            results_singles = sp.artist_albums(artist_id, album_type='single', limit=50)
+            single_ids.update([single['id'] for single in results_singles['items']])
+            while results_singles['next']:
+                results_singles = sp.next(results_singles)
+                single_ids.update([single['id'] for single in results_singles['items']])
+
+            all_album_ids = list(album_ids.union(single_ids))
+            logger.info(f"Total releases: {len(all_album_ids)}")
+
+            for idx, release_id in enumerate(all_album_ids, 1):
+                try:
+                    tracks = sp.album_tracks(release_id)
+                    all_tracks.extend([track['id'] for track in tracks['items']])
+                    await asyncio.sleep(0.2)
+
+                    if idx % 50 == 0:
+                        await asyncio.sleep(3)
+
+                except SpotifyException as e:
+                    if e.http_status == 429:
+                        retry_after = int(e.headers.get("Retry-After", 5))
+                        await asyncio.sleep(retry_after)
+                        continue
+                    else:
+                        raise
+
+        except Exception as e:
+            await client.send_message(message.chat.id, f"⚠️ Error fetching `{artist_id}`: {e}")
+            continue
+
+        # Send in parts every 5000
+        if len(all_tracks) >= 5000:
+            batch = all_tracks[:5000]
+            all_tracks = all_tracks[5000:]
+            part_file = f"tracks_part_{artist_counter}.txt"
+            with open(part_file, "w", encoding="utf-8") as f:
+                f.write("\n".join(batch))
+
+            await client.send_document(
+                chat_id=message.chat.id,
+                document=part_file,
+                caption=f"✅ Part from Artist #{artist_counter} (5000 tracks)"
+            )
+            await asyncio.sleep(3)
+
+    # Send remaining
+    if all_tracks:
+        part_file = f"tracks_final.txt"
+        with open(part_file, "w", encoding="utf-8") as f:
+            f.write("\n".join(all_tracks))
+
+        await client.send_document(
+            chat_id=message.chat.id,
+            document=part_file,
+            caption=f"✅ Final batch — Total tracks: {len(all_tracks)}"
+        )
+
+    await status_msg.edit("✅ Done! All artist track IDs fetched.")
+
