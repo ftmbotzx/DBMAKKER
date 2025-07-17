@@ -75,7 +75,7 @@ class Database:
 
     # ------------------ Save Media to DB ------------------ #
 
-    async def save_file(self, bot, media):
+    async def save_file(self, bot, media, message):
         try:
             file_id, file_ref = unpack_new_file_id(media.file_id)
             file_name = re.sub(r"[_\-.+]", " ", str(media.file_name or "Unknown"))
@@ -87,9 +87,9 @@ class Database:
                 "file_type": getattr(media, "file_type", None),
                 "mime_type": getattr(media, "mime_type", None),
                 "caption": media.caption.html if getattr(media, "caption", None) else None,
-                "chat_id": str(media.chat.id),
-                "msg_id": str(media.id)
-            }
+               "chat_id": str(message.chat.id),
+               "msg_id": str(message.message_id)}
+                
             await self.media_col.insert_one(file_data)
             logger.info(f"{file_name} saved to media DB")
             return True, 1
