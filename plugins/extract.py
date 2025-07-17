@@ -150,10 +150,15 @@ async def usernn_count(client, message):
         await message.reply(f"❌ Error: `{e}`")
 
 
-def extract_track_id_from_url(text):
-    match = re.search(r"track/([a-zA-Z0-9]+)", text)
-    return match.group(1) if match else None
+import re
 
+def extract_track_id_from_url(text):
+    # Match URLs like https://open.spotify.com/track/7qiZfU4dY1lWllzX7mPBI3
+    match = re.search(r"(?:https?://open\.spotify\.com/track/|spotify:track:)([a-zA-Z0-9]+)", text)
+    if match:
+        return match.group(1)
+    return None
+    
 async def search_track_id_from_text(query):
     results = sp.search(q=query, limit=1, type='track')
     items = results.get("tracks", {}).get("items", [])
