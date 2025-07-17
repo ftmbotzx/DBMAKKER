@@ -4,7 +4,7 @@ import base64
 from struct import pack
 import motor.motor_asyncio
 from pyrogram.file_id import FileId
-from info import MONGO_URI, MONGO_NAME
+from info import MONGO_URI, MONGO_NAME, COLLECTION_NAME
 from pymongo.errors import DuplicateKeyError
 from urllib.parse import urlparse
 
@@ -77,7 +77,7 @@ class Database:
         self.client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI)
         self.db = self.client[MONGO_NAME]
         self.dump_col = self.db["dump"]
-        self.media_col = self.db["media"]
+        self.media_col = self.db[COLLECTION_NAME]
 
     # Dump file_id ↔️ track_id mapping
     async def save_dump_file_id(self, track_id: str, file_id: str):
