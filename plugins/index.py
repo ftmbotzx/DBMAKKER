@@ -136,7 +136,6 @@ async def set_skip_number(bot, message):
 
 
 # ... (imports and config remain same)
-
 async def index_files_to_db(lst_msg_id, chat, msg, bot):
     total_files = 0
     duplicate = 0
@@ -146,9 +145,9 @@ async def index_files_to_db(lst_msg_id, chat, msg, bot):
     unsupported = 0
     async with lock:
         try:
-            current = temp.CURRENT
             temp.CANCEL = False
-            async for message in bot.iter_messages(chat, lst_msg_id, temp.CURRENT):
+            current = 0
+            async for message in bot.iter_messages(chat, offset_id=lst_msg_id, limit=10000):
                 if temp.CANCEL:
                     await msg.edit(
                         f"Successfully Cancelled!!\n\n"
@@ -160,6 +159,7 @@ async def index_files_to_db(lst_msg_id, chat, msg, bot):
                         f"Errors Occurred: <code>{errors}</code>"
                     )
                     break
+
                 current += 1
                 if current % 20 == 0:
                     can = [[InlineKeyboardButton('Cancel', callback_data='index_cancel')]]
@@ -189,6 +189,7 @@ async def index_files_to_db(lst_msg_id, chat, msg, bot):
                 if not media:
                     unsupported += 1
                     continue
+
                 media.file_type = message.media.value
                 media.caption = message.caption
                 aynav, vnay = await db.save_file(media)
