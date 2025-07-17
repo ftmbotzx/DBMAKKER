@@ -155,24 +155,22 @@ async def usernn_count(client, message):
 @Client.on_message(filters.command("topartists"))
 async def top_artists_list(client, message):
     try:
-        # ✅ Fixed Playlist: Top 50 - India (Public playlist link ID)
-        playlist_id = "37i9dQZEVXbLZ52XmnySJg"  # This is public & official
-        playlist = sp.playlist(playlist_id)
-        playlist_name = playlist['name']
+        query = "top hindi bollywood 2024"
+        market = "IN"
+        limit = 50
 
-        # Fetch tracks
-        results = sp.playlist_tracks(playlist_id)
+        results = sp.search(q=query, type='track', limit=limit, market=market)
+
         artists_set = set()
 
-        for item in results['items']:
-            track = item['track']
-            for artist in track['artists']:
+        for item in results['tracks']['items']:
+            for artist in item['artists']:
                 artists_set.add(artist['name'])
 
         artists = sorted(list(artists_set))
         total_count = len(artists)
 
-        text = f"**🇮🇳 Top Artists from Playlist:** `{playlist_name}`\n"
+        text = f"**🇮🇳 Estimated Top Artists from Search:** `{query}`\n"
         text += f"🎧 **Total Unique Artists:** `{total_count}`\n\n"
 
         for idx, name in enumerate(artists, 1):
@@ -181,7 +179,7 @@ async def top_artists_list(client, message):
         if len(text) > 4096:
             with open("top_artists_india.txt", "w", encoding="utf-8") as f:
                 f.write(text)
-            await message.reply_document("top_artists_india.txt", caption="📄 Artist list too long, sent as file.")
+            await message.reply_document("top_artists_india.txt", caption="📄 Artist list is too long, sent as file.")
         else:
             await message.reply(text)
 
