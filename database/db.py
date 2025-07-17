@@ -52,12 +52,13 @@ class Database:
             await self.media_col.insert_one(file_data)
             logger.info(f"{file_name} saved to media DB")
             return True, 1
-        except motor.motor_asyncio.AsyncIOMotorCollection.DuplicateKeyError:
+        except DuplicateKeyError:
             logger.warning(f"{file_name} already exists")
             return False, 0
         except Exception as e:
             logger.exception("Failed to save media")
             return False, 2
+
 
 # Initialize
 db = Database()
