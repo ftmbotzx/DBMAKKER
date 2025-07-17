@@ -3,6 +3,10 @@ import logging
 import motor.motor_asyncio
 from pyrogram.file_id import FileId
 from info import MONGO_URI, MONGO_NAME
+from pymongo.errors import DuplicateKeyError
+from umongo import Instance, Document, fields
+from motor.motor_asyncio import AsyncIOMotorClient
+from marshmallow.exceptions import ValidationError
 
 unpack_new_file_id = FileId
 
