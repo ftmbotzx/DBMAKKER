@@ -4,7 +4,7 @@ from spotipy.oauth2 import SpotifyClientCredentials
 import re
 
 from pyrogram.types import Message
-
+from pyrogram.errors import FloodWait
 
 client_id = "e54b28b15f574338a709fdbde414b428"
 client_secret = "7dead9452e6546fabdc9ad09ed00f172"
