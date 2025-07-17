@@ -6,6 +6,8 @@ import motor.motor_asyncio
 from pyrogram.file_id import FileId
 from info import MONGO_URI, MONGO_NAME
 from pymongo.errors import DuplicateKeyError
+from urllib.parse import urlparse
+
 
 logger = logging.getLogger(__name__)
 
@@ -46,18 +48,22 @@ def unpack_new_file_id(new_file_id):
 
 # ---------------------- Spotify Track Extractor ---------------------- #
 
-def extract_spotify_track_id(caption: str) -> str | None:
-    """
-    Extracts the Spotify track ID from a given caption.
-    Works with both HTML and plain text.
-    """
-    if not caption:
-        return None
-    match = re.search(r"https?://open\.spotify\.com/track/([a-zA-Z0-9]+)", caption)
+
+
+def extract_track_id(caption: str) -> str | None:
+    import re
+
+    # Try extracting from Spotify URL
+    match = re.search(r"(https?://open\.spotify\.com/track/([a-zA-Z0-9]+))", caption)
+    if match:
+        return match.group(2)
+
+    # Fallback: search for track ID pattern
+    match = re.search(r"\b([a-zA-Z0-9]{22})\b", caption)
     if match:
         return match.group(1)
-    return None
 
+    return None
 
 # ---------------------- Database Handler ---------------------- #
 
@@ -85,8 +91,8 @@ class Database:
         try:
             file_id, file_ref = unpack_new_file_id(media.file_id)
             file_name = re.sub(r"[_\-.+]", " ", str(media.file_name or "Unknown"))
-            caption_text = media.caption.text if hasattr(media.caption, "text") else str(media.caption or "")
-            track_id = extract_spotify_track_id(caption_text)
+            caption = message.caption or ""
+            track_id = extract_track_id(caption)
 
             file_data = {
                 "_id": file_id,
