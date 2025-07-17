@@ -30,7 +30,7 @@ class Database:
 
     # ------------------ Save Media to DB ------------------ #
 
-    async def save_media(self, bot, media):
+    async def save_file(self, bot, media):
         try:
             file_id, file_ref = unpack_new_file_id(media.file_id)
             file_name = re.sub(r"[_\-.+]", " ", str(media.file_name or "Unknown"))
