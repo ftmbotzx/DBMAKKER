@@ -1,7 +1,7 @@
 import re
 import logging
 import motor.motor_asyncio
-from pyrogram.file_id import unpack_new_file_id
+from pyrogram.file_id import unpack_new_file_id as FileId
 from info import MONGO_URI, MONGO_NAME
 
 logger = logging.getLogger(__name__)
