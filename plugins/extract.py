@@ -155,15 +155,13 @@ async def usernn_count(client, message):
 @Client.on_message(filters.command("topartists"))
 async def top_artists_list(client, message):
     try:
-        # Dynamically get the "Toplists" category for India
-        category = sp.category_playlists(category_id='toplists', country='IN')
-        playlist = category['playlists']['items'][0]  # Get 1st playlist (usually "Top 50 India")
-        playlist_id = playlist['id']
+        # ✅ Fixed Playlist: Top 50 - India (Public playlist link ID)
+        playlist_id = "37i9dQZEVXbLZ52XmnySJg"  # This is public & official
+        playlist = sp.playlist(playlist_id)
         playlist_name = playlist['name']
 
-        # Fetch tracks from that playlist
+        # Fetch tracks
         results = sp.playlist_tracks(playlist_id)
-
         artists_set = set()
 
         for item in results['items']:
@@ -183,7 +181,7 @@ async def top_artists_list(client, message):
         if len(text) > 4096:
             with open("top_artists_india.txt", "w", encoding="utf-8") as f:
                 f.write(text)
-            await message.reply_document("top_artists_india.txt", caption="📄 Artist list is too long, sent as file.")
+            await message.reply_document("top_artists_india.txt", caption="📄 Artist list too long, sent as file.")
         else:
             await message.reply(text)
 
