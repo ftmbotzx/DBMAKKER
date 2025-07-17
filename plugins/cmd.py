@@ -58,3 +58,27 @@ async def git_pull(client, message):
         os._exit(0)
 
     await message.reply_text(f"📦 Git Pull Output:\n```\n{output}\n```")
+
+
+@Client.on_message(filters.command("dbcheck") & filters.user(ADMINS))
+async def dbcheck_handler(client: Client, message: Message):
+    try:
+        # Total media documents
+        media_count = await db.db["media"].count_documents({})
+
+        # Total dump documents
+        dump_count = await db.db["dump"].count_documents({})
+
+        # Aapke other collections bhi ho toh unka yahan add karo:
+        # example: user_count = await db.db["users"].count_documents({})
+
+        text = (
+            f"📊 **Database Stats:**\n\n"
+            f"📁 Media Files: `{media_count}`\n"
+            f"🗃️ Dump Entries: `{dump_count}`\n"
+            # f"👤 Users: `{user_count}`\n"  # Add if needed
+        )
+        await message.reply(text)
+
+    except Exception as e:
+        await message.reply(f"❌ Error occurred: `{e}`")
