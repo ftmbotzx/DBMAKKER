@@ -212,33 +212,51 @@ async def get_spotify_track_id(client, message):
     )
 
 
+import re
+
+def parse_tg_link(link: str):
+    # Supports links like https://t.me/channelusername/123
+    match = re.search(r"t.me/([a-zA-Z0-9_]+)/(\d+)", link)
+    if match:
+        return match.group(1), int(match.group(2))
+    return None, None
+    
+
 @Client.on_message(filters.command("index") & filters.private)
-async def index_channel(client, message):
+async def index_command(client, message):
     if len(message.command) < 2:
-        await message.reply("Please provide channel username or ID.\nUsage: /index @channelusername")
-        return
+        return await message.reply("Send message link to start indexing.\nExample:\n/index https://t.me/channelusername/123")
 
-    channel = message.command[1]
-    messages = []
+    link = message.command[1]
+    channel, start_msg_id = parse_tg_link(link)
+    if not channel or not start_msg_id:
+        return await message.reply("Invalid Telegram message link.")
+
+    await message.reply(f"Starting indexing from {channel} message {start_msg_id}...")
+
+    count = 0
     try:
-        async for msg in client.iter_history(channel, limit=100):
-            messages.append(msg)
+        async for msg in client.iter_history(channel, offset_id=start_msg_id - 1, limit=100):
+            # Filter media
+            if msg.media and msg.media.value in ['audio', 'video', 'document']:
+                media = getattr(msg, msg.media.value)
+                data = {
+                    "chat": channel,
+                    "message_id": msg.message_id,
+                    "file_id": media.file_id,
+                    "file_type": msg.media.value,
+                    "caption": msg.caption,
+                    "date": msg.date.isoformat()
+                }
+               
+                count += 1
+            if count % 20 == 0:
+                await message.reply(f"Indexed {count} files so far...")
+    except FloodWait as e:
+        await message.reply(f"Flood wait! Sleeping for {e.x} seconds...")
+        await asyncio.sleep(e.x)
     except Exception as e:
-        await message.reply(f"Error fetching messages: {e}")
+        await message.reply(f"Error during indexing: {e}")
         return
 
-    if not messages:
-        await message.reply("No messages found in the channel.")
-        return
-
-    # iter_history returns messages newest to oldest, so:
-    start_id = messages[-1].message_id  # oldest
-    end_id = messages[0].message_id     # newest
-    count = len(messages)
-
-    reply_text = (
-        f"Fetched {count} messages from {channel}\n"
-        f"Start Message ID: {start_id}\n"
-        f"End Message ID: {end_id}"
-    )
-    await message.reply(reply_text)
+    await message.reply(f"Indexing completed. Total files indexed: {count}")
