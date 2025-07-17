@@ -145,3 +145,55 @@ async def usernn_count(client, message):
 
     except Exception as e:
         await message.reply(f"❌ Error: `{e}`")
+
+
+
+@Client.on_message(filters.command("getid") & filters.reply)
+async def get_spotify_id(client, message):
+    reply = message.reply_to_message
+
+    if not reply.audio and not reply.voice:
+        await message.reply("❗ Please reply to a music/audio message.")
+        return
+
+    caption = reply.caption or ""
+    track_id = None
+
+    # Try extracting Spotify link from caption
+    link_match = re.search(r"https?://open\.spotify\.com/track/([a-zA-Z0-9]+)", caption)
+    if link_match:
+        track_id = link_match.group(1)
+        await message.reply(f"✅ Spotify Track ID: `{track_id}`")
+        return
+
+    # If no link, try to extract title and artist from caption or file metadata
+    title = reply.audio.title if reply.audio else None
+    performer = reply.audio.performer if reply.audio else None
+
+    # If title/performer is in caption manually
+    if not title or not performer:
+        parts = caption.strip().split("-")
+        if len(parts) >= 2:
+            performer = parts[0].strip()
+            title = parts[1].strip()
+
+    if not title or not performer:
+        await message.reply("⚠️ Couldn't extract song title or artist.")
+        return
+
+    # Now search on Spotify
+    query = f"{performer} {title}"
+    try:
+        results = sp.search(q=query, type="track", limit=1)
+        items = results['tracks']['items']
+        if not items:
+            await message.reply("❌ No matching track found on Spotify.")
+            return
+
+        track = items[0]
+        track_id = track['id']
+        track_url = track['external_urls']['spotify']
+        await message.reply(f"✅ Track ID: `{track_id}`\n🔗 [Open in Spotify]({track_url})", disable_web_page_preview=True)
+    except Exception as e:
+        await message.reply(f"❌ Error: `{e}`")
+
