@@ -96,18 +96,30 @@ class Database:
         try:
             file_id, file_ref = unpack_new_file_id(media.file_id)
             file_name = re.sub(r"[_\-.+]", " ", str(media.file_name or "Unknown"))
-            caption = message.caption.html if message.caption and message.caption.html else message.caption.text if message.caption else None
-
+            
+            caption = None
+            if message.caption:
+                if hasattr(message.caption, "html") and message.caption.html:
+                    caption = message.caption.html
+                elif hasattr(message.caption, "text") and message.caption.text:
+                    caption = message.caption.text
+            
+            artist = getattr(media, "performer", None)
+            title = getattr(media, "title", None)
+            duration = getattr(media, "duration", None)
             track_id = extract_track_id(caption)
 
             file_data = {
                 "_id": file_id,
                 "file_ref": file_ref,
                 "file_name": file_name,
+                "artist": artist,
+                "title": title,
+                "duration": duration,
                 "file_size": getattr(media, "file_size", 0),
                 "file_type": getattr(media, "file_type", None),
                 "mime_type": getattr(media, "mime_type", None),
-                "caption": media.caption.html if getattr(media, "caption", None) else None,
+                "caption": caption,
                 "chat_id": str(message.chat.id),
                 "msg_id": message.id,
                 "track_id": track_id
@@ -121,7 +133,7 @@ class Database:
             logger.warning(f"{file_name} already exists")
             return False, 0
 
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to save media")
             return False, 2
 
