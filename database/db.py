@@ -88,7 +88,7 @@ class Database:
                 "mime_type": getattr(media, "mime_type", None),
                 "caption": media.caption.html if getattr(media, "caption", None) else None,
                "chat_id": str(message.chat.id),
-               "msg_id": str(message.message_id)}
+               "msg_id": str(message.id)}
                 
             await self.media_col.insert_one(file_data)
             logger.info(f"{file_name} saved to media DB")
