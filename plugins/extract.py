@@ -258,8 +258,7 @@ async def artist_bulk_tracks(client, message):
         artist_counter += 1
 
         try:
-            # Rate limiting check (100 requests/min)
-            if request_counter >= 100:
+            if request_counter >= 70:
                 elapsed = time.time() - last_reset
                 if elapsed < 60:
                     await asyncio.sleep(60 - elapsed)
@@ -303,7 +302,11 @@ async def artist_bulk_tracks(client, message):
             await client.send_message(message.chat.id, f"⚠️ Error fetching `{artist_id}`: {e}")
             continue
 
-        # Send in parts every 5000 tracks
+        logger.info("⏳ Waiting 60 seconds before next artist...")
+
+        await asyncio.sleep(60)
+        
+
         if len(all_tracks) >= 5000:
             batch = all_tracks[:5000]
             all_tracks = all_tracks[5000:]
@@ -357,7 +360,6 @@ async def check_tracks_in_db(client, message):
             else:
                 already_in_db += 1
 
-            # Progress update har 100 tracks
             if idx % 100 == 0 or idx == total_tracks:
                 text = (
                     f"Processing tracks...\n"
@@ -393,7 +395,7 @@ async def check_tracks_in_db(client, message):
             document=filename,
             caption=f"✅ New Tracks Batch {i}/{len(batches)} - {len(batch)} tracks"
         )
-        await asyncio.sleep(3)  # safe delay for telegram flood limits
+        await asyncio.sleep(3)
 
     await status_msg.edit(
         f"✅ Done!\n"
