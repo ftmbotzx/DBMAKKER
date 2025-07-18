@@ -4,6 +4,11 @@ from pyrogram import Client, filters
 from spotipy import SpotifyException
 import logging
 from plugins.spotify_client_manager import SpotifyClientManager  # Import the custom manager
+import aiohttp
+import asyncio
+import itertools
+import base64
+import logging
 
 logger = logging.getLogger(__name__)
 
