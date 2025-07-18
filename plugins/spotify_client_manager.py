@@ -12,7 +12,7 @@ class SpotifyClientManager:
         self.client_cycle = itertools.cycle(clients)
         self.current_token = None
         self.token_expiry = 0
-        self.lock = asyncio.Lock()
+        self.lock = asyncio.Lock() 
 
         # Rate limiting tracking
         self.request_counter = 0
