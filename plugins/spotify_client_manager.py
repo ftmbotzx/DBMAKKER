@@ -69,7 +69,7 @@ class SpotifyClientManager:
                 self.current_token = token
                 self.token_expiry = now + expires_in - 60
                 self.current_client = client
-                logger.info(f"Switched Spotify token to client_id={client['client_id']}")
+             
 
             headers = {"Authorization": f"Bearer {self.current_token}"}
 
