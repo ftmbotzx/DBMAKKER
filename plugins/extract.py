@@ -232,7 +232,7 @@ async def safe_spotify_call(func, *args, **kwargs):
             else:
                 raise
                
-@Client.on_message(filters.command("artist") & filters.private & filters.reply)
+@Client.on_message(filters.command("sa") & filters.private & filters.reply)
 async def artist_bulk_tracks(client, message):
     if not message.reply_to_message or not message.reply_to_message.document:
         await message.reply("❗ Please reply to a `.txt` file containing artist links.")
