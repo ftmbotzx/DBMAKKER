@@ -3,7 +3,7 @@ import re
 from pyrogram import Client, filters
 from spotipy import SpotifyException
 import logging
-from spotify_client_manager import SpotifyClientManager  # Import the custom manager
+from plugins.spotify_client_manager import SpotifyClientManager  # Import the custom manager
 
 logger = logging.getLogger(__name__)
 
