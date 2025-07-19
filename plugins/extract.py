@@ -244,12 +244,26 @@ async def artist_bulk_tracks(client, message):
     with open(file_path, "r", encoding="utf-8") as f:
         lines = f.readlines()
 
+    PROGRESS_FILE = "artist_progress.json"
     all_tracks = []
-    artist_counter = 0
     request_counter = 0
+    artist_counter = 0
+    start_index = 0
     last_reset = time.time()
 
-    for line in lines:
+    # Load progress if exists
+    if os.path.exists(PROGRESS_FILE):
+        with open(PROGRESS_FILE, "r") as pf:
+            progress = json.load(pf)
+            start_index = progress.get("artist_index", 0)
+            request_counter = progress.get("request_counter", 0)
+            all_tracks = progress.get("all_tracks", [])
+        await message.reply(f"🔄 Resuming from artist #{start_index+1} with {request_counter} requests used.")
+    else:
+        await message.reply("🚀 Starting fresh...")
+
+    for idx in range(start_index, len(lines)):
+        line = lines[idx]
         match = re.search(r"spotify\.com/artist/([a-zA-Z0-9]+)", line)
         if not match:
             continue
@@ -258,7 +272,7 @@ async def artist_bulk_tracks(client, message):
         artist_counter += 1
 
         try:
-            if request_counter >= 70:
+            if request_counter >= 90:
                 elapsed = time.time() - last_reset
                 if elapsed < 60:
                     await asyncio.sleep(60 - elapsed)
@@ -279,14 +293,14 @@ async def artist_bulk_tracks(client, message):
 
             logger.info(f"📀 Total releases: {len(album_ids)}")
 
-            for idx, release_id in enumerate(album_ids, 1):
+            for release_id in album_ids:
                 try:
                     tracks = await safe_spotify_call(sp.album_tracks, release_id)
                     request_counter += 1
                     all_tracks.extend([track['id'] for track in tracks['items']])
-                    await asyncio.sleep(0.2)  # minor delay between album track calls
+                    await asyncio.sleep(0.2)
 
-                    if idx % 50 == 0:
+                    if request_counter % 50 == 0:
                         await asyncio.sleep(3)
 
                 except SpotifyException as e:
@@ -302,11 +316,6 @@ async def artist_bulk_tracks(client, message):
             await client.send_message(message.chat.id, f"⚠️ Error fetching `{artist_id}`: {e}")
             continue
 
-        logger.info("⏳ Waiting 60 seconds before next artist...")
-
-        await asyncio.sleep(60)
-        
-
         if len(all_tracks) >= 5000:
             batch = all_tracks[:5000]
             all_tracks = all_tracks[5000:]
@@ -321,6 +330,20 @@ async def artist_bulk_tracks(client, message):
             )
             await asyncio.sleep(3)
 
+        with open(PROGRESS_FILE, "w") as pf:
+            json.dump({
+                "artist_index": idx + 1,
+                "request_counter": request_counter,
+                "all_tracks": all_tracks
+            }, pf)
+
+        # Check if 10,000 requests done
+        if request_counter >= 10000:
+            await message.reply(f"⛔ 10,000 request limit reached. Progress saved at artist #{idx+1}.")
+            return
+
+  
+
     # Send remaining tracks
     if all_tracks:
         part_file = f"tracks_final.txt"
@@ -333,7 +356,12 @@ async def artist_bulk_tracks(client, message):
             caption=f"✅ Final batch — Total tracks: {len(all_tracks)}"
         )
 
+    # Clean up progress file
+    if os.path.exists(PROGRESS_FILE):
+        os.remove(PROGRESS_FILE)
+
     await status_msg.edit("✅ Done! All artist track IDs fetched.")
+
 
 
 @Client.on_message(filters.command("checkall") & filters.private & filters.reply)
