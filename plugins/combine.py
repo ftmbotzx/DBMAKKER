@@ -7,7 +7,7 @@ COMBINED_FILE = "combined_track_ids.txt"
 @Client.on_message(filters.document & filters.private)
 async def auto_combine_track_ids(client, message):
     if not message.document.file_name.endswith(".txt"):
-        return  # Ignore other files
+        return
 
     file_path = await message.download()
     added_ids = 0
@@ -20,21 +20,15 @@ async def auto_combine_track_ids(client, message):
         if not os.path.exists(COMBINED_FILE):
             open(COMBINED_FILE, "w", encoding="utf-8").close()
 
-        # Load existing track IDs
-        with open(COMBINED_FILE, "r", encoding="utf-8") as combined_file:
-            existing_ids = set(line.strip() for line in combined_file if line.strip())
-
-        # Append only new
-        new_ids = [track_id for track_id in incoming_ids if track_id not in existing_ids]
+        # Append all incoming IDs without duplicate check
         with open(COMBINED_FILE, "a", encoding="utf-8") as combined_file:
-            for track_id in new_ids:
+            for track_id in incoming_ids:
                 combined_file.write(track_id + "\n")
                 added_ids += 1
 
-        await message.reply(f"✅ `{added_ids}` new track IDs added.")
+        await message.reply(f"✅ `{added_ids}` track IDs added (including duplicates).")
     except Exception as e:
         await message.reply(f"❌ Error:\n`{e}`")
-
 
 # 2. /clear command to wipe the combined file
 @Client.on_message(filters.command("clear") & filters.private)
