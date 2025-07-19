@@ -21,8 +21,8 @@ logger = logging.getLogger(__name__)
 
 
 
-client_secret = "f317c8085a81406bb6244c8c3182f283"
-client_id = "8afb35368d464b5ba5615fbaeae7ed20"
+client_secret = "1cf618724f244263805fe511ece20518"
+client_id = "29bb28fe38134e1ab1a512e829e908cb"
 
 auth_manager = SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
 sp = spotipy.Spotify(auth_manager=auth_manager)
@@ -236,6 +236,8 @@ async def safe_spotify_call(func, *args, **kwargs):
             else:
                 raise
                
+PROGRESS_FILE = "artist_progress.json"
+
 @Client.on_message(filters.command("sa") & filters.private & filters.reply)
 async def artist_bulk_tracks(client, message):
     if not message.reply_to_message or not message.reply_to_message.document:
@@ -252,16 +254,15 @@ async def artist_bulk_tracks(client, message):
     with open(file_path, "r", encoding="utf-8") as f:
         lines = f.readlines()
 
-    PROGRESS_FILE = "artist_progress.json"
     all_tracks = []
     request_counter = 0
-    artist_counter = 0
     start_index = 0
     last_reset = time.time()
 
     # 🧠 Load progress if exists & valid
     if manual_skip is not None:
         start_index = manual_skip
+        artist_counter = start_index
         await message.reply(f"⏩ Starting from artist #{start_index+1} (manual skip).")
     elif os.path.exists(PROGRESS_FILE):
         try:
@@ -273,17 +274,20 @@ async def artist_bulk_tracks(client, message):
                 start_index = progress.get("artist_index", 0)
                 request_counter = progress.get("request_counter", 0)
                 all_tracks = progress.get("all_tracks", [])
+            artist_counter = start_index
             await message.reply(f"🔄 Resuming from artist #{start_index+1} with {request_counter} requests used.")
         except Exception as e:
             await message.reply(f"⚠️ Progress file corrupted or empty. Starting fresh.\n\nError: {e}")
             start_index = 0
             request_counter = 0
             all_tracks = []
+            artist_counter = 0
     else:
         await message.reply("🚀 Starting fresh...")
+        artist_counter = 0
 
     for idx in range(start_index, len(lines)):
-        line = lines[idx]
+        line = lines[idx].strip()
         match = re.search(r"spotify\.com/artist/([a-zA-Z0-9]+)", line)
         if not match:
             continue
