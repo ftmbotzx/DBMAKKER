@@ -242,6 +242,10 @@ async def artist_bulk_tracks(client, message):
         await message.reply("❗ Please reply to a `.txt` file containing artist links.")
         return
 
+    # 🔢 Parse optional skip number from command
+    args = message.text.strip().split()
+    manual_skip = int(args[1]) if len(args) > 1 and args[1].isdigit() else None
+
     status_msg = await message.reply("📥 Downloading file...")
 
     file_path = await message.reply_to_message.download()
@@ -256,7 +260,10 @@ async def artist_bulk_tracks(client, message):
     last_reset = time.time()
 
     # 🧠 Load progress if exists & valid
-    if os.path.exists(PROGRESS_FILE):
+    if manual_skip is not None:
+        start_index = manual_skip
+        await message.reply(f"⏩ Starting from artist #{start_index+1} (manual skip).")
+    elif os.path.exists(PROGRESS_FILE):
         try:
             with open(PROGRESS_FILE, "r", encoding="utf-8") as pf:
                 content = pf.read().strip()
