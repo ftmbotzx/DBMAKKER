@@ -255,14 +255,23 @@ async def artist_bulk_tracks(client, message):
     start_index = 0
     last_reset = time.time()
 
-    # Load progress if exists
+    # 🧠 Load progress if exists & valid
     if os.path.exists(PROGRESS_FILE):
-        with open(PROGRESS_FILE, "r") as pf:
-            progress = json.load(pf)
-            start_index = progress.get("artist_index", 0)
-            request_counter = progress.get("request_counter", 0)
-            all_tracks = progress.get("all_tracks", [])
-        await message.reply(f"🔄 Resuming from artist #{start_index+1} with {request_counter} requests used.")
+        try:
+            with open(PROGRESS_FILE, "r", encoding="utf-8") as pf:
+                content = pf.read().strip()
+                if not content:
+                    raise ValueError("Progress file is empty.")
+                progress = json.loads(content)
+                start_index = progress.get("artist_index", 0)
+                request_counter = progress.get("request_counter", 0)
+                all_tracks = progress.get("all_tracks", [])
+            await message.reply(f"🔄 Resuming from artist #{start_index+1} with {request_counter} requests used.")
+        except Exception as e:
+            await message.reply(f"⚠️ Progress file corrupted or empty. Starting fresh.\n\nError: {e}")
+            start_index = 0
+            request_counter = 0
+            all_tracks = []
     else:
         await message.reply("🚀 Starting fresh...")
 
@@ -334,21 +343,20 @@ async def artist_bulk_tracks(client, message):
             )
             await asyncio.sleep(3)
 
-        with open(PROGRESS_FILE, "w") as pf:
+        # 💾 Save progress safely
+        with open(PROGRESS_FILE, "w", encoding="utf-8") as pf:
             json.dump({
                 "artist_index": idx + 1,
                 "request_counter": request_counter,
                 "all_tracks": all_tracks
             }, pf)
 
-        # Check if 10,000 requests done
+        # ⛔ Limit check
         if request_counter >= 10000:
             await message.reply(f"⛔ 10,000 request limit reached. Progress saved at artist #{idx+1}.")
             return
 
-  
-
-    # Send remaining tracks
+    # ✅ Send final batch
     if all_tracks:
         part_file = f"tracks_final.txt"
         with open(part_file, "w", encoding="utf-8") as f:
@@ -360,13 +368,11 @@ async def artist_bulk_tracks(client, message):
             caption=f"✅ Final batch — Total tracks: {len(all_tracks)}"
         )
 
-    # Clean up progress file
+    # 🧹 Clean progress
     if os.path.exists(PROGRESS_FILE):
         os.remove(PROGRESS_FILE)
 
     await status_msg.edit("✅ Done! All artist track IDs fetched.")
-
-
 
 @Client.on_message(filters.command("checkall") & filters.private & filters.reply)
 async def check_tracks_in_db(client, message):
