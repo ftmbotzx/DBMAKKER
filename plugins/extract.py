@@ -394,14 +394,16 @@ async def artist_bulk_tracks(client, message: Message):
                 continue
 
         if artist_tracks:
-            filename = f"artist_{artist_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+            artist_info = await safe_spotify_call(sp.artist, artist_id)
+            artist_name = artist_info.get("name", artist_id)
+            filename = f"artist_{artist_name}__{artist_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
             with open(filename, "w", encoding="utf-8") as f:
                 f.write("\n".join(artist_tracks))
 
             await client.send_document(
                 chat_id=message.chat.id,
                 document=filename,
-                caption=f"✅ Artist #{artist_counter}: `{artist_id}` — {len(artist_tracks)} tracks"
+                caption=f"✅ Artist #{artist_counter}: - {artist_name}__`{artist_id}` — {len(artist_tracks)} tracks"
             )
 
             all_tracks.extend(artist_tracks)
