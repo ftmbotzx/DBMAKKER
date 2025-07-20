@@ -326,29 +326,83 @@ async def artist_bulk_tracks(client, message):
                         if exists:
                             continue
                         all_tracks.append(track_id)
-                     
+
                     await asyncio.sleep(0.2)
 
                     if request_counter % 50 == 0:
                         await asyncio.sleep(3)
 
-                except SpotifyException as e:
-                    if e.http_status == 429:
+                except Exception as e:
+                    # Check if rate limit error inside inner loop
+                    if hasattr(e, 'http_status') and e.http_status == 429:
                         retry_after = int(e.headers.get("Retry-After", 5))
-                        await asyncio.sleep(retry_after)
-                        continue
+
+                        # Save partial tracks and progress then exit
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        partial_filename = f"ratelimit_partial_{artist_id}_{timestamp}.txt"
+                        with open(partial_filename, "w", encoding="utf-8") as pf:
+                            pf.write("\n".join(all_tracks))
+
+                        await client.send_document(
+                            message.chat.id,
+                            partial_filename,
+                            caption=(
+                                f"⛔ Rate limit hit during album tracks fetch!\n"
+                                f"Last artist processed: `{artist_id}` (Artist #{artist_counter})\n"
+                                f"Total tracks collected: {len(all_tracks)}\n"
+                                f"Retry after: {retry_after} seconds\n\n"
+                                f"Resume with `/sa {idx}`"
+                            )
+                        )
+                        # Save progress json
+                        with open(PROGRESS_FILE, "w", encoding="utf-8") as ppf:
+                            json.dump({
+                                "artist_index": idx,
+                                "request_counter": request_counter,
+                                "all_tracks": all_tracks
+                            }, ppf)
+                        os.remove(file_path)
+                        return
                     else:
                         raise
 
         except Exception as e:
-            logger.warning(f"⚠️ Error with artist {artist_id}: {e}")
-            await client.send_message(message.chat.id, f"⚠️ Error fetching `{artist_id}`: {e}")
-            continue
+            # Top-level rate limit check
+            if hasattr(e, 'http_status') and e.http_status == 429:
+                retry_after = int(e.headers.get("Retry-After", 5))
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                partial_filename = f"ratelimit_partial_{artist_id}_{timestamp}.txt"
+                with open(partial_filename, "w", encoding="utf-8") as pf:
+                    pf.write("\n".join(all_tracks))
+
+                await client.send_document(
+                    message.chat.id,
+                    partial_filename,
+                    caption=(
+                        f"⛔ Rate limit hit!\n"
+                        f"Last artist processed: `{artist_id}` (Artist #{artist_counter})\n"
+                        f"Total tracks collected: {len(all_tracks)}\n"
+                        f"Retry after: {retry_after} seconds\n\n"
+                        f"Resume with `/sa {idx}`"
+                    )
+                )
+                with open(PROGRESS_FILE, "w", encoding="utf-8") as ppf:
+                    json.dump({
+                        "artist_index": idx,
+                        "request_counter": request_counter,
+                        "all_tracks": all_tracks
+                    }, ppf)
+                os.remove(file_path)
+                return
+            else:
+                logger.warning(f"⚠️ Error with artist {artist_id}: {e}")
+                await client.send_message(message.chat.id, f"⚠️ Error fetching `{artist_id}`: {e}")
+                continue
 
         if len(all_tracks) >= 5000:
             batch = all_tracks[:5000]
             all_tracks = all_tracks[5000:]
-            part_file = f"tracks_part_{artist_counter}.txt"
+            part_file = f"tracks_part_{artist_counter}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
             with open(part_file, "w", encoding="utf-8") as f:
                 f.write("\n".join(batch))
 
@@ -370,11 +424,12 @@ async def artist_bulk_tracks(client, message):
         # ⛔ Limit check
         if request_counter >= 10000:
             await message.reply(f"⛔ 10,000 request limit reached. Progress saved at artist #{idx+1}.")
+            os.remove(file_path)
             return
 
     # ✅ Send final batch
     if all_tracks:
-        part_file = f"tracks_final.txt"
+        part_file = f"tracks_final_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
         with open(part_file, "w", encoding="utf-8") as f:
             f.write("\n".join(all_tracks))
 
@@ -388,6 +443,7 @@ async def artist_bulk_tracks(client, message):
         os.remove(PROGRESS_FILE)
 
     await status_msg.edit("✅ Done! All artist track IDs fetched.")
+    os.remove(file_path)
 
 @Client.on_message(filters.command("checkall") & filters.private & filters.reply)
 async def check_tracks_in_db(client, message):
