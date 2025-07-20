@@ -235,20 +235,14 @@ async def safe_spotify_call(func, *args, **kwargs):
             else:
                 raise
                
-PROGRESS_FILE = "artist_progress.json"
+PROGRESS_FILE = "progress.json"
 
 import os
 import time
 import json
 import re
 import asyncio
-from datetime import datetime
-from pyrogram import Client, filters
-from pyrogram.types import Message
-from info import PROGRESS_FILE
-from utils import safe_spotify_call
-from database.db import db
-from logger import logger
+
 
 @Client.on_message(filters.command("sa") & filters.private & filters.reply)
 async def artist_bulk_tracks(client, message: Message):
