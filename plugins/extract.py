@@ -84,7 +84,6 @@ async def user_tracks_split(client, message):
                             all_ids.append(tid)
                             total_tracks += 1
 
-                            # Optionally: update progress every 1000 tracks
                             if total_tracks % 200 == 0:
                                 await status.edit(
                                     f"📦 Still fetching...\n"
@@ -306,8 +305,9 @@ async def artist_bulk_tracks(client, message):
             logger.info(f"🎤 Fetching albums for Artist {artist_counter}: {artist_id}")
             album_ids = set()
 
-            results = await safe_spotify_call(sp.artist_albums, artist_id, album_type='album,single', limit=50)
+            results = await safe_spotify_call(sp.artist_albums, artist_id, album_type='album,single,appears_on,compilation', limit=50)
             request_counter += 1
+
             album_ids.update([album['id'] for album in results['items']])
 
             while results['next']:
