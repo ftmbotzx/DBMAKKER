@@ -243,7 +243,6 @@ async def artist_bulk_tracks(client, message):
         await message.reply("❗ Please reply to a `.txt` file containing artist links.")
         return
 
-    # 🔢 Parse optional skip number from command
     args = message.text.strip().split()
     manual_skip = int(args[1]) if len(args) > 1 and args[1].isdigit() else None
 
@@ -321,7 +320,13 @@ async def artist_bulk_tracks(client, message):
                 try:
                     tracks = await safe_spotify_call(sp.album_tracks, release_id)
                     request_counter += 1
-                    all_tracks.extend([track['id'] for track in tracks['items']])
+                    for track in tracks['items']:
+                        track_id = track['id']
+                        exists = await db.get_dump_file_id(track_id)
+                        if exists:
+                            continue
+                        all_tracks.append(track_id)
+                     
                     await asyncio.sleep(0.2)
 
                     if request_counter % 50 == 0:
@@ -379,7 +384,6 @@ async def artist_bulk_tracks(client, message):
             caption=f"✅ Final batch — Total tracks: {len(all_tracks)}"
         )
 
-    # 🧹 Clean progress
     if os.path.exists(PROGRESS_FILE):
         os.remove(PROGRESS_FILE)
 
