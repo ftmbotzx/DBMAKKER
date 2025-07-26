@@ -2,6 +2,7 @@ from pyrogram import Client, filters
 import os
 from database.db import db
 import asyncio
+from datetime import datetime
 
 COMBINED_FILE = "combined_track_ids.txt"
 
@@ -91,8 +92,6 @@ async def check_tracks_in_db(client, message):
                 await status_msg.edit(text)
             except Exception:
                 pass
-
-    # ✍️ Step 3: Split and send new tracks in batches
     if not new_tracks:
         return await status_msg.edit("✅ Done! All tracks already exist in DB.")
 
@@ -100,7 +99,8 @@ async def check_tracks_in_db(client, message):
     batches = [new_tracks[i:i + batch_size] for i in range(0, len(new_tracks), batch_size)]
 
     for i, batch in enumerate(batches, 1):
-        filename = f"new_tracks_part_{i}.txt"
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"new_tracks_{timestamp}_part_{i}.txt"
         with open(filename, "w", encoding="utf-8") as f:
             f.write("\n".join(batch))
 
