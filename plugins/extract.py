@@ -21,8 +21,8 @@ logger = logging.getLogger(__name__)
 
 
 
-client_secret = "f69875e10cc84e04a1a60c061a55012d"
-client_id = "eee9c7e5d00245d793dc2befa5b52c5c"
+client_secret = "f4073094a91849bb9153c0b67b574806"
+client_id = "3c7b577a92174fafb522039a52b2bc36"
 
 auth_manager = SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
 sp = spotipy.Spotify(auth_manager=auth_manager)
